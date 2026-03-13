@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AEDS3 Trader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>AEDS3 Trader</h1>
+        <nav class="nav-links">
+            <a href="index.html">Início</a>
+            <a href="cadastro.html">Criar Conta</a>
+        </nav>
+    </header>
+    <main class="container">
+        <div class="card" style="max-width: 400px; margin: auto;">
+            <h2>Login</h2>
+            <div id="mensagem"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="senha">Senha</label>
+                    <input type="password" id="senha" required>
+                </div>
+                <button type="submit" style="width: 100%;">Entrar</button>
+            </form>
+            <p style="text-align: center; margin-top: 1rem; color: var(--text-light);">
+                Não tem uma conta? <a href="cadastro.html" style="color: var(--primary);">Cadastre-se</a>
+            </p>
+        </div>
+    </main>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const senha = document.getElementById('senha').value;
+            const msgDiv = document.getElementById('mensagem');
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('usuario', JSON.stringify(data));
+                    location.href = 'dashboard.html';
+                } else {
+                    msgDiv.innerHTML = `<div class="alert alert-error">${data.erro}</div>`;
+                }
+            } catch (error) {
+                msgDiv.innerHTML = `<div class="alert alert-error">Erro ao conectar ao servidor</div>`;
+            }
+        });
+    </script>
+</body>
+</html>

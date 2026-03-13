@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AEDS3 Trader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>AEDS3 Trader</h1>
+        <nav class="nav-links">
+            <a href="ativos.html">Ver Ativos</a>
+            <a href="transacoes.html">Minhas Transações</a>
+            <button onclick="logout()" class="secondary">Sair</button>
+        </nav>
+    </header>
+    <main class="container">
+        <div class="card">
+            <h2 id="bemVindo">Bem-vindo!</h2>
+            <p style="color: var(--text-light); margin-top: 1rem;">O que você deseja fazer hoje?</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 2rem;">
+                <div class="card" style="cursor: pointer;" onclick="location.href='ativos.html'">
+                    <h3>📈 Ativos</h3>
+                    <p>Veja os ativos disponíveis e realize negociações.</p>
+                </div>
+                <div class="card" style="cursor: pointer;" onclick="location.href='transacoes.html'">
+                    <h3>📜 Transações</h3>
+                    <p>Confira seu histórico de compras e vendas.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const usuario = JSON.parse(localStorage.getItem('usuario'));
+        if (!usuario) {
+            location.href = 'login.html';
+        } else {
+            document.getElementById('bemVindo').innerText = `Bem-vindo, ${usuario.nome}!`;
+        }
+
+        function logout() {
+            localStorage.removeItem('usuario');
+            location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

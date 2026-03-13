@@ -44,6 +44,10 @@ public class AtivoController {
         }
     }
 
+    public List<Ativo> listarAtivos() throws IOException {
+        return dao.list();
+    }
+
     public void listar() throws IOException {
         List<Ativo> ativos = dao.list();
         if (ativos.isEmpty()) {

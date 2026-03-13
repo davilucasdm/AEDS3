@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Transações - AEDS3 Trader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>AEDS3 Trader</h1>
+        <nav class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="ativos.html">Ver Ativos</a>
+            <button onclick="logout()" class="secondary">Sair</button>
+        </nav>
+    </header>
+    <main class="container">
+        <div class="card">
+            <h2>Histórico de Transações</h2>
+            <table id="tabelaTransacoes">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Ativo ID</th>
+                        <th>Tipo</th>
+                        <th>Quantidade</th>
+                        <th>Preço Unit.</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const usuario = JSON.parse(localStorage.getItem('usuario'));
+        if (!usuario) location.href = 'login.html';
+
+        async function carregarTransacoes() {
+            try {
+                const response = await fetch(`/api/transacoes?idUsuario=${usuario.id}`);
+                const transacoes = await response.json();
+                const tbody = document.querySelector('#tabelaTransacoes tbody');
+                tbody.innerHTML = '';
+
+                transacoes.reverse().forEach(t => {
+                    const data = new Date(t.timestamp).toLocaleString();
+                    const total = t.quantidade * t.precoUnitario;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${data}</td>
+                        <td>${t.idAtivo}</td>
+                        <td style="color: ${t.tipo === 'COMPRA' ? 'var(--success)' : 'var(--danger)'}; font-weight: bold;">
+                            ${t.tipo}
+                        </td>
+                        <td>${t.quantidade}</td>
+                        <td>R$ ${t.precoUnitario.toFixed(2)}</td>
+                        <td>R$ ${total.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar transações', error);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('usuario');
+            location.href = 'index.html';
+        }
+
+        carregarTransacoes();
+    </script>
+</body>
+</html>

@@ -3,44 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Investimentos - Home</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
-        header { background-color: #333; color: #fff; padding: 1rem; text-align: center; }
-        nav ul { list-style: none; padding: 0; }
-        nav ul li { display: inline; margin-right: 15px; }
-        nav ul li a { color: #fff; text-decoration: none; }
-        main { padding: 20px; max-width: 800px; margin: 20px auto; background: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        .welcome { text-align: center; }
-        .actions { margin-top: 20px; }
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 5px; font-size: 16px; margin: 5px; }
-        button:hover { background-color: #0056b3; }
-        footer { text-align: center; padding: 1rem; position: fixed; bottom: 0; width: 100%; background: #eee; }
-    </style>
+    <title>Negociação de Ativos</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
-        <h1>Sistema de Gerenciamento Financeiro</h1>
-        <nav>
-            <ul>
-                <li><a href="index.html">Home</a></li>
-                <li><a href="usuarios.html">Usuários</a></li>
-                <li><a href="ativos.html">Ativos</a></li>
-            </ul>
+        <h1>AEDS3 Trader</h1>
+        <nav class="nav-links">
+            <a href="login.html">Login</a>
+            <a href="cadastro.html">Criar Conta</a>
         </nav>
     </header>
-    <main>
-        <section class="welcome">
-            <h2>Bem-vindo ao Sistema</h2>
-            <p>Gerencie seus usuários e ativos financeiros de forma eficiente.</p>
-            <div class="actions">
-                <button onclick="location.href='usuarios.html'">Gerenciar Usuários</button>
-                <button onclick="location.href='ativos.html'">Gerenciar Ativos</button>
+    <main class="container">
+        <div class="card" style="text-align: center;">
+            <h2>Sistema de Negociação de Ativos</h2>
+            <p style="color: var(--text-light); margin: 1rem 0 2rem 0;">Acesse sua conta para começar a negociar.</p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button onclick="location.href='login.html'">Login</button>
+                <button class="secondary" onclick="location.href='cadastro.html'">Criar Conta</button>
             </div>
-        </section>
+        </div>
     </main>
-    <footer>
-        <p>&copy; 2026 - AEDS III</p>
-    </footer>
 </body>
 </html>

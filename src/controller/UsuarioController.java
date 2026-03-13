@@ -20,18 +20,25 @@ public class UsuarioController {
         System.out.println("Usuário cadastrado com ID: " + id);
     }
 
-    public void login(String email, String senha) throws IOException {
+    public Usuario login(String email, String senha) throws IOException {
         Usuario u = dao.buscarPorEmail(email);
         if (u != null) {
             String senhaDigitadaCrip = Criptografia.criptografar(senha);
             if (u.getSenhaCriptografada().equals(senhaDigitadaCrip)) {
-                System.out.println("Login realizado com sucesso! Bem-vindo, " + u.getNome() + ".");
-            } else {
-                System.out.println("Senha incorreta.");
+                return u;
             }
-        } else {
-            System.out.println("Usuário não encontrado.");
         }
+        return null;
+    }
+
+    public boolean cadastrarUsuario(String nome, String email, String senha) throws IOException {
+        if (dao.buscarPorEmail(email) != null) {
+            return false;
+        }
+        String senhaCrip = Criptografia.criptografar(senha);
+        Usuario u = new Usuario(-1, nome, email, senhaCrip, System.currentTimeMillis());
+        dao.create(u);
+        return true;
     }
 
     public void buscar(int id) throws IOException {

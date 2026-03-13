@@ -63,7 +63,14 @@ public class Usuario {
         nome = dis.readUTF();
         email = dis.readUTF();
         senhaCriptografada = dis.readUTF();
-        criadoEm = dis.readLong();
+
+        // Compatibilidade com registros antigos que nao tinham o campo criadoEm.
+        // Se o registro vier no formato antigo (menor), evita EOFException.
+        if (dis.available() >= Long.BYTES) {
+            criadoEm = dis.readLong();
+        } else {
+            criadoEm = 0L;
+        }
     }
 
     @Override

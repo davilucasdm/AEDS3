@@ -48,9 +48,10 @@ public class UsuarioDAO {
         while (arq.getFilePointer() < arq.length()) {
             boolean lapide = arq.readBoolean();
             int tamanho = arq.readInt();
+            if (!registroCabeNoArquivo(tamanho)) break;
             if (!lapide) {
                 byte[] b = new byte[tamanho];
-                arq.read(b);
+                arq.readFully(b);
                 Usuario u = new Usuario();
                 u.fromByteArray(b);
                 if (u.getId() == id) {
@@ -69,9 +70,10 @@ public class UsuarioDAO {
             long pos = arq.getFilePointer();
             boolean lapide = arq.readBoolean();
             int tamanho = arq.readInt();
+            if (!registroCabeNoArquivo(tamanho)) break;
             if (!lapide) {
                 byte[] b = new byte[tamanho];
-                arq.read(b);
+                arq.readFully(b);
                 Usuario temp = new Usuario();
                 temp.fromByteArray(b);
                 if (temp.getId() == u.getId()) {
@@ -105,9 +107,10 @@ public class UsuarioDAO {
             long pos = arq.getFilePointer();
             boolean lapide = arq.readBoolean();
             int tamanho = arq.readInt();
+            if (!registroCabeNoArquivo(tamanho)) break;
             if (!lapide) {
                 byte[] b = new byte[tamanho];
-                arq.read(b);
+                arq.readFully(b);
                 Usuario u = new Usuario();
                 u.fromByteArray(b);
                 if (u.getId() == id) {
@@ -128,9 +131,10 @@ public class UsuarioDAO {
         while (arq.getFilePointer() < arq.length()) {
             boolean lapide = arq.readBoolean();
             int tamanho = arq.readInt();
+            if (!registroCabeNoArquivo(tamanho)) break;
             if (!lapide) {
                 byte[] b = new byte[tamanho];
-                arq.read(b);
+                arq.readFully(b);
                 Usuario u = new Usuario();
                 u.fromByteArray(b);
                 lista.add(u);
@@ -146,9 +150,10 @@ public class UsuarioDAO {
         while (arq.getFilePointer() < arq.length()) {
             boolean lapide = arq.readBoolean();
             int tamanho = arq.readInt();
+            if (!registroCabeNoArquivo(tamanho)) break;
             if (!lapide) {
                 byte[] b = new byte[tamanho];
-                arq.read(b);
+                arq.readFully(b);
                 Usuario u = new Usuario();
                 u.fromByteArray(b);
                 if (u.getEmail().equals(email)) {
@@ -159,6 +164,12 @@ public class UsuarioDAO {
             }
         }
         return null;
+    }
+
+    private boolean registroCabeNoArquivo(int tamanho) throws IOException {
+        if (tamanho < 0) return false;
+        long restantes = arq.length() - arq.getFilePointer();
+        return tamanho <= restantes;
     }
 
     public void close() throws IOException {

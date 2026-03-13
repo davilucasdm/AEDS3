@@ -81,3 +81,134 @@
     </footer>
 </body>
 </html>
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ativos - AEDS3 Trader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>AEDS3 Trader</h1>
+        <nav class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="transacoes.html">Minhas Transações</a>
+            <button onclick="logout()" class="secondary">Sair</button>
+        </nav>
+    </header>
+    <main class="container">
+        <div class="card">
+            <h2>Ativos Disponíveis</h2>
+            <div id="mensagem"></div>
+            <table id="tabelaAtivos">
+                <thead>
+                    <tr>
+                        <th>Ativo</th>
+                        <th>Empresa</th>
+                        <th>Preço</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Modal Simples de Compra -->
+        <div id="modalCompra" class="card" style="display: none; margin-top: 2rem;">
+            <h3>Confirmar Compra</h3>
+            <p id="infoAtivo"></p>
+            <div class="form-group">
+                <label for="quantidade">Quantidade</label>
+                <input type="number" id="quantidade" value="1" min="1">
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button id="btnConfirmar">Confirmar Compra</button>
+                <button class="secondary" onclick="fecharModal()">Cancelar</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const usuario = JSON.parse(localStorage.getItem('usuario'));
+        if (!usuario) location.href = 'login.html';
+
+        let ativoSelecionado = null;
+
+        async function carregarAtivos() {
+            try {
+                const response = await fetch('/api/ativos');
+                const ativos = await response.json();
+                const tbody = document.querySelector('#tabelaAtivos tbody');
+                tbody.innerHTML = '';
+
+                ativos.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${a.ticker}</td>
+                        <td>${a.nome}</td>
+                        <td>R$ ${a.precoAtual.toFixed(2)}</td>
+                        <td>
+                            <button onclick='abrirModal(${JSON.stringify(a)})'>Comprar</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar ativos', error);
+            }
+        }
+
+        function abrirModal(ativo) {
+            ativoSelecionado = ativo;
+            document.getElementById('infoAtivo').innerText = `${ativo.ticker} - ${ativo.nome} (Preço: R$ ${ativo.precoAtual.toFixed(2)})`;
+            document.getElementById('modalCompra').style.display = 'block';
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        function fecharModal() {
+            document.getElementById('modalCompra').style.display = 'none';
+            ativoSelecionado = null;
+        }
+
+        document.getElementById('btnConfirmar').addEventListener('click', async () => {
+            const quantidade = document.getElementById('quantidade').value;
+            const msgDiv = document.getElementById('mensagem');
+
+            try {
+                const response = await fetch('/api/comprar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        idUsuario: usuario.id,
+                        idAtivo: ativoSelecionado.id,
+                        quantidade: parseInt(quantidade),
+                        preco: ativoSelecionado.precoAtual
+                    })
+                });
+
+                if (response.ok) {
+                    msgDiv.innerHTML = `<div class="alert alert-success">Compra de ${quantidade} ${ativoSelecionado.ticker} realizada com sucesso!</div>`;
+                    fecharModal();
+                    setTimeout(() => msgDiv.innerHTML = '', 3000);
+                } else {
+                    msgDiv.innerHTML = `<div class="alert alert-error">Erro ao realizar compra</div>`;
+                }
+            } catch (error) {
+                msgDiv.innerHTML = `<div class="alert alert-error">Erro de conexão</div>`;
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('usuario');
+            location.href = 'index.html';
+        }
+
+        carregarAtivos();
+    </script>
+</body>
+</html>

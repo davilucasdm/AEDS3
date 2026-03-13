@@ -25,6 +25,17 @@ public class TransacaoController {
         System.out.println("Venda registrada com ID: " + id);
     }
 
+    public List<Transacao> obterTransacoesUsuario(int idUsuario) throws IOException {
+        List<Transacao> todas = dao.listarTodas();
+        List<Transacao> doUsuario = new ArrayList<>();
+        for (Transacao t : todas) {
+            if (t.getIdUsuario() == idUsuario) {
+                doUsuario.add(t);
+            }
+        }
+        return doUsuario;
+    }
+
     public void listarTransacoesUsuario(int idUsuario) throws IOException {
         List<Transacao> todas = dao.listarTodas();
         List<Transacao> doUsuario = new ArrayList<>();
