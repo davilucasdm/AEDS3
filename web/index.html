@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clínica Médica — AED III</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Tela de Login ─────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🏥</div>
+      <div class="text">
+        <h2>Clínica Médica</h2>
+        <p>Sistema de Gestão — AED III</p>
+      </div>
+    </div>
+    <div class="login-title">Entrar</div>
+    <div class="login-sub">Faça login para continuar</div>
+    <div id="login-error" class="login-error"></div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Login</label>
+      <input id="inp-login" placeholder="admin" value="admin" autocomplete="username">
+    </div>
+    <div class="form-group" style="margin-bottom:20px">
+      <label>Senha</label>
+      <input id="inp-senha" type="password" placeholder="••••••••" value="admin123" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="doLogin()">
+      Entrar
+    </button>
+    <div style="margin-top:18px;text-align:center;font-size:12px;color:var(--text3)">
+      Usuário padrão: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px">admin / admin123</code>
+    </div>
+  </div>
+</div>
+
+<!-- ── App Principal ─────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="icon">🏥</div>
+      <div>
+        <div class="name">Clínica Médica</div>
+        <div class="sub">AED III · PUC Minas</div>
+      </div>
+    </div>
+
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+      <span class="ni-icon">⊞</span>
+      <span class="ni-label">Dashboard</span>
+    </div>
+
+    <div class="nav-section">Cadastros</div>
+    <div class="nav-item" data-page="pacientes" onclick="navigate('pacientes')">
+      <span class="ni-icon">👥</span>
+      <span class="ni-label">Pacientes</span>
+      <span class="ni-badge" data-badge="pacientes">0</span>
+    </div>
+    <div class="nav-item" data-page="medicos" onclick="navigate('medicos')">
+      <span class="ni-icon">👨‍⚕️</span>
+      <span class="ni-label">Médicos</span>
+      <span class="ni-badge" data-badge="medicos">0</span>
+    </div>
+    <div class="nav-item" data-page="especialidades" onclick="navigate('especialidades')">
+      <span class="ni-icon">🩺</span>
+      <span class="ni-label">Especialidades</span>
+      <span class="ni-badge" data-badge="especialidades">0</span>
+    </div>
+
+    <div class="nav-section">Atendimento</div>
+    <div class="nav-item" data-page="consultas" onclick="navigate('consultas')">
+      <span class="ni-icon">📋</span>
+      <span class="ni-label">Consultas</span>
+      <span class="ni-badge" data-badge="consultas">0</span>
+    </div>
+
+    <div class="nav-section">Administração</div>
+    <div class="nav-item" data-page="usuarios" onclick="navigate('usuarios')">
+      <span class="ni-icon">🔑</span>
+      <span class="ni-label">Usuários</span>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="nav-item" onclick="doLogout()">
+        <span class="ni-icon">↩</span>
+        <span class="ni-label">Sair</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <div id="main">
+    <header id="topbar">
+      <div id="topbar-title" class="topbar-title">Dashboard</div>
+      <div class="topbar-right">
+        <div class="user-chip" onclick="navigate('usuarios')">
+          <div id="user-avatar" class="user-avatar">A</div>
+          <span id="user-name" class="user-name">admin</span>
+        </div>
+      </div>
+    </header>
+    <main id="content"></main>
+  </div>
+</div>
+
+<!-- ── Modal ─────────────────────────────────────────────────────────────── -->
+<div id="modal" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-head-title">Modal</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-foot" class="modal-foot"></div>
+  </div>
+</div>
+
+<!-- ── Toast area ─────────────────────────────────────────────────────────── -->
+<div id="toast-area" class="toast-area"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/AEDS3.iml" filepath="$PROJECT_DIR$/AEDS3.iml" />
+      <module fileurl="file://$PROJECT_DIR$/clinica.iml" filepath="$PROJECT_DIR$/clinica.iml" />
     </modules>
   </component>
 </project>
