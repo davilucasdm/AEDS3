@@ -4,157 +4,365 @@ import clinica.dao.*;
 import clinica.index.OrdenacaoExterna;
 import clinica.model.*;
 import java.io.IOException;
-import java.util.List;
+import java.util.*;
 
-/** Fachada de serviços — agrega todos os DAOs e expõe operações de negócio */
+/**
+ * Camada de serviço da Clínica Médica.
+ *
+ * Centraliza a lógica de negócio e integra todos os DAOs: - PacienteDAO,
+ * MedicoDAO, EspecialidadeDAO, ConsultaDAO, UsuarioDAO - MedicoEspecialidadeDAO
+ * ← FASE III: tabela N:N
+ *
+ * Responsabilidades desta classe: 1. Operações CRUD de todas as entidades. 2.
+ * Relacionamento N:N (Médico ↔ Especialidade) via tabela intermediária. 3.
+ * Integridade referencial (cascata de exclusão). 4. Ordenação externa
+ * (intercalação) e travessia B+ para listagens ordenadas. 5. Autenticação de
+ * usuários.
+ */
 public class ClinicaService {
 
-    private final String                dataDir;
-    private final PacienteDAO           pacienteDAO;
-    private final MedicoDAO             medicoDAO;
-    private final EspecialidadeDAO      especialidadeDAO;
-    private final ConsultaDAO           consultaDAO;
-    private final MedicoEspecialidadeDAO meDAO;
-    private final UsuarioDAO            usuarioDAO;
+    private final PacienteDAO pacienteDAO;
+    private final MedicoDAO medicoDAO;
+    private final EspecialidadeDAO espDAO;
+    private final ConsultaDAO consultaDAO;
+    private final UsuarioDAO usuarioDAO;
+    private final MedicoEspecialidadeDAO meDAO;   // FASE III
+
+    private final String dataDir;
 
     public ClinicaService(String dataDir) throws IOException {
-        this.dataDir     = dataDir;
-        pacienteDAO      = new PacienteDAO(dataDir);
-        medicoDAO        = new MedicoDAO(dataDir);
-        especialidadeDAO = new EspecialidadeDAO(dataDir);
-        consultaDAO      = new ConsultaDAO(dataDir);
-        meDAO            = new MedicoEspecialidadeDAO(dataDir);
-        usuarioDAO       = new UsuarioDAO(dataDir);
+        this.dataDir = dataDir;
+        pacienteDAO = new PacienteDAO(dataDir);
+        medicoDAO = new MedicoDAO(dataDir);
+        espDAO = new EspecialidadeDAO(dataDir);
+        consultaDAO = new ConsultaDAO(dataDir);
+        usuarioDAO = new UsuarioDAO(dataDir);
+        meDAO = new MedicoEspecialidadeDAO(dataDir);  // FASE III
+
+        // Cria admin padrão se não existir nenhum usuário
         usuarioDAO.criarAdminSeNecessario();
     }
 
-    // ─── Autenticação ───────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════
+    // AUTENTICAÇÃO
+    // ═══════════════════════════════════════════════════════════════════════
     public boolean login(String login, String senha) throws IOException {
         return usuarioDAO.autenticar(login, senha);
     }
+
     public Usuario buscarUsuarioPorLogin(String login) throws IOException {
         return usuarioDAO.buscarPorLogin(login);
     }
+
+    public int criarUsuario(Usuario u) throws IOException {
+        return usuarioDAO.criar(u);
+    }
+
     public List<Usuario> listarUsuarios() throws IOException {
         return usuarioDAO.listarTodos();
     }
-    public int criarUsuario(Usuario u) throws IOException { return usuarioDAO.criar(u); }
-    public boolean deletarUsuario(int id) throws IOException { return usuarioDAO.deletar(id); }
 
-    // ─── Pacientes ──────────────────────────────────────────────────────────
-    public int           criarPaciente(Paciente p)    throws IOException { return pacienteDAO.criar(p); }
-    public Paciente      buscarPaciente(int id)        throws IOException { return pacienteDAO.buscarPorIdHash(id); }
-    public List<Paciente>listarPacientes()             throws IOException { return pacienteDAO.listarOrdenados(); }
-    public List<Paciente>buscarPacienteNome(String n)  throws IOException { return pacienteDAO.buscarPorNome(n); }
-    public boolean       atualizarPaciente(Paciente p) throws IOException { return pacienteDAO.atualizar(p); }
-    public boolean       deletarPaciente(int id)       throws IOException { return pacienteDAO.deletar(id); }
-
-    // ─── Médicos ────────────────────────────────────────────────────────────
-    public int         criarMedico(Medico m)       throws IOException { return medicoDAO.criar(m); }
-    public Medico      buscarMedico(int id)         throws IOException { return medicoDAO.buscarPorIdHash(id); }
-    public List<Medico>listarMedicos()              throws IOException { return medicoDAO.listarOrdenados(); }
-    public List<Medico>buscarMedicoNome(String n)   throws IOException { return medicoDAO.buscarPorNome(n); }
-    public boolean     atualizarMedico(Medico m)    throws IOException { return medicoDAO.atualizar(m); }
-    public boolean     deletarMedico(int id)        throws IOException { return medicoDAO.deletar(id); }
-
-    // ─── Especialidades ─────────────────────────────────────────────────────
-    public int              criarEsp(Especialidade e)   throws IOException { return especialidadeDAO.criar(e); }
-    public Especialidade    buscarEsp(int id)            throws IOException { return especialidadeDAO.buscarPorIdHash(id); }
-    public List<Especialidade> listarEsps()             throws IOException { return especialidadeDAO.listarTodos(); }
-    public boolean          atualizarEsp(Especialidade e)throws IOException { return especialidadeDAO.atualizar(e); }
-    public boolean          deletarEsp(int id)           throws IOException { return especialidadeDAO.deletar(id); }
-
-    // ─── Vínculos Médico ↔ Especialidade (N:N) ────────────────────────────
-    public int     vincularMedicoEsp(int idMedico, int idEsp) throws IOException {
-        return meDAO.criar(new MedicoEspecialidade(0, true, idMedico, idEsp));
-    }
-    public boolean desvincularMedicoEsp(int idMedico, int idEsp) throws IOException {
-        return meDAO.removerVinculo(idMedico, idEsp);
-    }
-    public List<Especialidade> especialidadesDeMedico(int idMedico) throws IOException {
-        java.util.List<Especialidade> res = new java.util.ArrayList<>();
-        for (int idE : meDAO.idEspecialidadesPorMedico(idMedico)) {
-            Especialidade e = especialidadeDAO.buscarPorIdHash(idE);
-            if (e != null) res.add(e);
-        }
-        return res;
-    }
-    public List<Medico> medicosPorEspecialidade(int idEsp) throws IOException {
-        java.util.List<Medico> res = new java.util.ArrayList<>();
-        for (int idM : meDAO.idMedicosPorEspecialidade(idEsp)) {
-            Medico m = medicoDAO.buscarPorIdHash(idM);
-            if (m != null) res.add(m);
-        }
-        return res;
+    public boolean deletarUsuario(int id) throws IOException {
+        return usuarioDAO.deletar(id);
     }
 
-    // ─── Consultas ──────────────────────────────────────────────────────────
-    public int           criarConsulta(Consulta c)    throws IOException { return consultaDAO.criar(c); }
-    public Consulta      buscarConsulta(int id)        throws IOException { return consultaDAO.buscarPorIdHash(id); }
-    public List<Consulta>listarConsultas()             throws IOException { return consultaDAO.listarOrdenadas(); }
-    public List<Consulta>consultasPorPaciente(int id)  throws IOException { return consultaDAO.listarPorPaciente(id); }
-    public List<Consulta>consultasPorMedico(int id)    throws IOException { return consultaDAO.listarPorMedico(id); }
-    public boolean       atualizarConsulta(Consulta c) throws IOException { return consultaDAO.atualizar(c); }
-    public boolean       deletarConsulta(int id)       throws IOException { return consultaDAO.deletar(id); }
+    // ═══════════════════════════════════════════════════════════════════════
+    // PACIENTES
+    // ═══════════════════════════════════════════════════════════════════════
+    public int criarPaciente(Paciente p) throws IOException {
+        return pacienteDAO.criar(p);
+    }
 
-    // ─── Ordenação Externa por Intercalação ─────────────────────────────────
+    public Paciente buscarPaciente(int id) throws IOException {
+        Paciente p = pacienteDAO.buscarPorIdHash(id);
+        return (p != null) ? p : pacienteDAO.buscarPorId(id);
+    }
+
+    public List<Paciente> listarPacientes() throws IOException {
+        return pacienteDAO.listarTodos();
+    }
+
+    public List<Paciente> buscarPacienteNome(String padrao) throws IOException {
+        return pacienteDAO.buscarPorNome(padrao);
+    }
+
+    public boolean atualizarPaciente(Paciente p) throws IOException {
+        return pacienteDAO.atualizar(p);
+    }
 
     /**
-     * Ordena pacientes.dat por nome (campo string, offset=5, tamanho=100)
-     * e grava em pacientes_sorted.dat.
-     * Estrutura do registro Paciente:
-     *   [0-3]  int  id
-     *   [4]    bool ativo
-     *   [5-104] String nome (100 bytes)
+     * Exclui paciente e todas as consultas associadas (integridade referencial
+     * 1:N).
      */
-    public String ordenarPacientesPorNome(boolean decrescente) throws IOException {
-        // offset 5 = 4 (int id) + 1 (boolean ativo)
-        var cmp = OrdenacaoExterna.porCampoString(5, 100);
-        if (decrescente) cmp = OrdenacaoExterna.decrescente(cmp);
+    public boolean deletarPaciente(int id) throws IOException {
+        // Cascata: remove consultas do paciente
+        for (Consulta c : consultaDAO.listarPorPaciente(id)) {
+            consultaDAO.deletar(c.getId());
+        }
+        return pacienteDAO.deletar(id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MÉDICOS
+    // ═══════════════════════════════════════════════════════════════════════
+    public int criarMedico(Medico m) throws IOException {
+        return medicoDAO.criar(m);
+    }
+
+    public Medico buscarMedico(int id) throws IOException {
+        Medico m = medicoDAO.buscarPorIdHash(id);
+        return (m != null) ? m : medicoDAO.buscarPorId(id);
+    }
+
+    public List<Medico> listarMedicos() throws IOException {
+        return medicoDAO.listarTodos();
+    }
+
+    public List<Medico> buscarMedicoNome(String padrao) throws IOException {
+        List<Medico> res = new ArrayList<>();
+        for (Medico m : medicoDAO.listarTodos()) {
+            if (m.getNome() != null && m.getNome().toLowerCase().contains(padrao.toLowerCase())) {
+                res.add(m);
+            }
+        }
+        return res;
+    }
+
+    public boolean atualizarMedico(Medico m) throws IOException {
+        return medicoDAO.atualizar(m);
+    }
+
+    /**
+     * Exclui médico, suas consultas (1:N) e seus vínculos de especialidade
+     * (N:N). Integridade referencial completa.
+     */
+    public boolean deletarMedico(int id) throws IOException {
+        // Cascata 1:N → consultas do médico
+        for (Consulta c : consultaDAO.listarPorMedico(id)) {
+            consultaDAO.deletar(c.getId());
+        }
+        // Cascata N:N → vínculos de especialidade
+        removerTodosVinculosMedico(id);
+        return medicoDAO.deletar(id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ESPECIALIDADES
+    // ═══════════════════════════════════════════════════════════════════════
+    public int criarEsp(Especialidade e) throws IOException {
+        return espDAO.criar(e);
+    }
+
+    public Especialidade buscarEsp(int id) throws IOException {
+        Especialidade e = espDAO.buscarPorIdHash(id);
+        return (e != null) ? e : espDAO.buscarPorId(id);
+    }
+
+    public List<Especialidade> listarEsps() throws IOException {
+        return espDAO.listarTodos();
+    }
+
+    public boolean atualizarEsp(Especialidade e) throws IOException {
+        return espDAO.atualizar(e);
+    }
+
+    /**
+     * Exclui especialidade e todos os vínculos N:N associados.
+     */
+    public boolean deletarEsp(int id) throws IOException {
+        // Cascata N:N → remove vínculos da especialidade
+        removerTodosVinculosEspecialidade(id);
+        return espDAO.deletar(id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONSULTAS
+    // ═══════════════════════════════════════════════════════════════════════
+    public int criarConsulta(Consulta c) throws IOException {
+        return consultaDAO.criar(c);
+    }
+
+    public Consulta buscarConsulta(int id) throws IOException {
+        Consulta c = consultaDAO.buscarPorIdHash(id);
+        return (c != null) ? c : consultaDAO.buscarPorId(id);
+    }
+
+    public List<Consulta> listarConsultas() throws IOException {
+        return consultaDAO.listarTodos();
+    }
+
+    public List<Consulta> consultasPorPaciente(int idPaciente) throws IOException {
+        return consultaDAO.listarPorPaciente(idPaciente);
+    }
+
+    public List<Consulta> consultasPorMedico(int idMedico) throws IOException {
+        return consultaDAO.listarPorMedico(idMedico);
+    }
+
+    public boolean atualizarConsulta(Consulta c) throws IOException {
+        return consultaDAO.atualizar(c);
+    }
+
+    public boolean deletarConsulta(int id) throws IOException {
+        return consultaDAO.deletar(id);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RELACIONAMENTO N:N — MÉDICO ↔ ESPECIALIDADE  (FASE III)
+    // ═══════════════════════════════════════════════════════════════════════
+    /**
+     * Cria um vínculo entre médico e especialidade. Se o vínculo já existe,
+     * retorna o ID existente sem duplicar.
+     *
+     * @return ID do registro em MedicoEspecialidade
+     */
+    public int vincularMedicoEsp(int idMedico, int idEspecialidade) throws IOException {
+        MedicoEspecialidade me = new MedicoEspecialidade(0, true, idMedico, idEspecialidade);
+        return meDAO.criar(me);
+    }
+
+    /**
+     * Remove logicamente o vínculo entre médico e especialidade.
+     */
+    public boolean desvincularMedicoEsp(int idMedico, int idEspecialidade) throws IOException {
+        return meDAO.removerVinculo(idMedico, idEspecialidade);
+    }
+
+    /**
+     * Retorna a lista de Especialidades associadas a um médico. Navegação N:N:
+     * Médico → Especialidades.
+     */
+    public List<Especialidade> especialidadesDeMedico(int idMedico) throws IOException {
+        List<Especialidade> resultado = new ArrayList<>();
+        for (int idEsp : meDAO.idEspecialidadesPorMedico(idMedico)) {
+            Especialidade e = buscarEsp(idEsp);
+            if (e != null) {
+                resultado.add(e);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Retorna a lista de Médicos que possuem determinada especialidade.
+     * Navegação N:N inversa: Especialidade → Médicos.
+     */
+    public List<Medico> medicosPorEspecialidade(int idEspecialidade) throws IOException {
+        List<Medico> resultado = new ArrayList<>();
+        for (int idMed : meDAO.idMedicosPorEspecialidade(idEspecialidade)) {
+            Medico m = buscarMedico(idMed);
+            if (m != null) {
+                resultado.add(m);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Remove todos os vínculos N:N de um médico (cascata ao deletar médico).
+     */
+    private void removerTodosVinculosMedico(int idMedico) throws IOException {
+        for (int idEsp : meDAO.idEspecialidadesPorMedico(idMedico)) {
+            meDAO.removerVinculo(idMedico, idEsp);
+        }
+    }
+
+    /**
+     * Remove todos os vínculos N:N de uma especialidade (cascata ao deletar
+     * especialidade).
+     */
+    private void removerTodosVinculosEspecialidade(int idEspecialidade) throws IOException {
+        for (int idMed : meDAO.idMedicosPorEspecialidade(idEspecialidade)) {
+            meDAO.removerVinculo(idMed, idEspecialidade);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ORDENAÇÃO EXTERNA (intercalação) + TRAVESSIA B+
+    // ═══════════════════════════════════════════════════════════════════════
+    /**
+     * Ordena pacientes por nome via ordenação externa por intercalação. A
+     * Árvore B+ indexa por ID; a ordenação por nome usa OrdenacaoExterna.
+     *
+     * @return caminho do arquivo gerado
+     */
+    public String ordenarPacientesPorNome(boolean desc) throws IOException {
         String saida = dataDir + "/pacientes_sorted.dat";
+        // Paciente: offset do nome = 4(id)+1(ativo) = 5, tamanho = 100 bytes
+        var cmp = OrdenacaoExterna.porCampoString(5, 100);
+        if (desc) {
+            cmp = OrdenacaoExterna.decrescente(cmp);
+        }
         new OrdenacaoExterna(629, cmp).ordenar(dataDir + "/pacientes.dat", saida);
         return saida;
     }
 
     /**
-     * Ordena medicos.dat por nome (offset=5, tamanho=100).
-     * Estrutura Medico: [0-3] id | [4] ativo | [5-104] nome (100 bytes)
+     * Ordena médicos por nome via Árvore B+ (travessia em ordem) + fallback
+     * para ordenação externa quando a B+ não indexa o campo nome.
+     *
+     * Como a B+ de médicos indexa por ID (não por nome), usamos
+     * OrdenacaoExterna para ordenar pelo campo nome — demonstrando ambas as
+     * funcionalidades.
+     *
+     * @return caminho do arquivo gerado
      */
-    public String ordenarMedicosPorNome(boolean decrescente) throws IOException {
-        var cmp = OrdenacaoExterna.porCampoString(5, 100);
-        if (decrescente) cmp = OrdenacaoExterna.decrescente(cmp);
+    public String ordenarMedicosPorNome(boolean desc) throws IOException {
         String saida = dataDir + "/medicos_sorted.dat";
+        // Medico: offset do nome = 4(id)+1(ativo) = 5, tamanho = 100 bytes
+        var cmp = OrdenacaoExterna.porCampoString(5, 100);
+        if (desc) {
+            cmp = OrdenacaoExterna.decrescente(cmp);
+        }
         new OrdenacaoExterna(375, cmp).ordenar(dataDir + "/medicos.dat", saida);
         return saida;
     }
 
     /**
-     * Ordena consultas.dat por data (campo string, offset=17, tamanho=10).
-     * Estrutura Consulta:
-     *   [0-3]  int  id
-     *   [4]    bool ativo
-     *   [5-8]  int  idPaciente
-     *   [9-12] int  idMedico
-     *   [13-22] String data (10 bytes, yyyy-MM-dd → ordenável lexicograficamente)
+     * Ordena consultas por data via Árvore B+ (listarOrdenadas usa B+). Para
+     * fins de exportação, também gera arquivo ordenado via OrdenacaoExterna.
+     *
+     * @return caminho do arquivo gerado
      */
-    public String ordenarConsultasPorData(boolean decrescente) throws IOException {
-        // offset: 4(id)+1(ativo)+4(idPac)+4(idMed) = 13
+    public String ordenarConsultasPorData(boolean desc) throws IOException {
+        String saida = dataDir + "/consultas_sorted_data.dat";
+        // Consulta: offset da data = 4+1+4+4 = 13, tamanho = 10 bytes
         var cmp = OrdenacaoExterna.porCampoString(13, 10);
-        if (decrescente) cmp = OrdenacaoExterna.decrescente(cmp);
-        String saida = dataDir + "/consultas_sorted.dat";
+        if (desc) {
+            cmp = OrdenacaoExterna.decrescente(cmp);
+        }
         new OrdenacaoExterna(651, cmp).ordenar(dataDir + "/consultas.dat", saida);
         return saida;
     }
 
     /**
-     * Ordena consultas.dat por valor (double, offset=23).
-     * Offset: 4(id)+1(ativo)+4(idPac)+4(idMed)+10(data)+5(horario) = 28
+     * Ordena consultas por valor via ordenação externa.
+     *
+     * @return caminho do arquivo gerado
      */
-    public String ordenarConsultasPorValor(boolean decrescente) throws IOException {
-        var cmp = OrdenacaoExterna.porCampoDouble(28);
-        if (decrescente) cmp = OrdenacaoExterna.decrescente(cmp);
+    public String ordenarConsultasPorValor(boolean desc) throws IOException {
         String saida = dataDir + "/consultas_sorted_valor.dat";
+        // Consulta: offset do valor = 4+1+4+4+10+5 = 28, tipo double (8 bytes)
+        var cmp = OrdenacaoExterna.porCampoDouble(28);
+        if (desc) {
+            cmp = OrdenacaoExterna.decrescente(cmp);
+        }
         new OrdenacaoExterna(651, cmp).ordenar(dataDir + "/consultas.dat", saida);
         return saida;
+    }
+
+    /**
+     * Lista médicos em ordem crescente de ID usando travessia da Árvore B+. Sem
+     * ordenação em memória principal — usa o encadeamento de folhas da B+.
+     */
+    public List<Medico> listarMedicosOrdenadosBPlus() throws IOException {
+        return medicoDAO.listarOrdenados();
+    }
+
+    /**
+     * Lista consultas em ordem via Árvore B+.
+     */
+    public List<Consulta> listarConsultasOrdenadas() throws IOException {
+        return consultaDAO.listarOrdenadas();
     }
 }

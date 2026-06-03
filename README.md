@@ -4,6 +4,14 @@ Sistema de gerenciamento de dados em memória secundária com índices B+ e Hash
 
 ---
 
+## Documentação — Fase III
+
+> **Relacionamento N:N com Tabela Intermediária**
+
+[Documentacao_Fase3_AED3.pdf](docs/Documentacao_Fase3_AED3.pdf)
+
+---
+
 ## Estrutura do Projeto
 
 ```
@@ -39,6 +47,8 @@ clinica/
 │   ├── index.html
 │   ├── css/style.css
 │   └── js/app.js
+├── docs/
+│   └── Documentacao_Fase3_AED3.pdf     ← documentação técnica da Fase III
 ├── data/                                ← arquivos binários gerados em runtime
 └── bin/                                 ← bytecode compilado
 ```
@@ -88,11 +98,11 @@ Bytes 12+  : registros de tamanho fixo
 
 | Fase | Status | O que está pronto |
 |---|---|---|
-| Fase 1 | ✅ | Modelagem, CRUD de todas as tabelas, persistência binária com cabeçalho |
-| Fase 2 | ✅ | Hash Extensível, Árvore B+, relacionamento 1:N, ordenação externa |
-| Fase 3 | 🔜 | Tabela N:N (estrutura pronta, indexação associada a completar) |
-| Fase 4 | 🔜 | Huffman, LZW, Boyer-Moore, KMP |
-| Fase 5 | 🔜 (estrutura pronta) | Login com XOR (CriptoXOR.java já implementado) |
+| Fase 1 | Concluída | Modelagem, CRUD de todas as tabelas, persistência binária com cabeçalho |
+| Fase 2 | Concluída | Hash Extensível, Árvore B+, relacionamento 1:N, ordenação externa |
+| Fase 3 | Concluída | Tabela N:N com chave composta, Hash duplo, listagem ordenada via B+ |
+| Fase 4 | Pendente | Huffman, LZW, Boyer-Moore, KMP |
+| Fase 5 | Pendente (estrutura pronta) | Login com XOR (CriptoXOR.java já implementado) |
 
 ---
 
@@ -106,4 +116,6 @@ Bytes 12+  : registros de tamanho fixo
 | GET/POST/PUT/DELETE | `/api/especialidades[/id]` | CRUD especialidades |
 | GET/POST/PUT/DELETE | `/api/consultas[/id]` | CRUD consultas |
 | GET/POST/DELETE | `/api/vinculos` | Relacionamento N:N Médico↔Especialidade |
+| GET | `/api/listar-ordenado?entidade=medicos` | Listagem ordenada via travessia da Árvore B+ |
+| GET | `/api/listar-ordenado?entidade=consultas` | Listagem ordenada via travessia da Árvore B+ |
 | GET/POST/DELETE | `/api/usuarios[/id]` | Gestão de usuários |
