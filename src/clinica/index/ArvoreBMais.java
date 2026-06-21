@@ -4,24 +4,6 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Árvore B+ persistida em arquivo binário.
- * Grau mínimo t=2 → max 3 chaves, max 4 filhos por nó.
- *
- * Formato do arquivo:
- *   Bytes  0- 7: offset do nó raiz (long, -1 = vazio)
- *   Bytes  8-15: próximo offset disponível para novo nó (long)
- *   A partir do byte 16: nós com NODE_SIZE bytes cada
- *
- * Estrutura do nó (NODE_SIZE = 80 bytes):
- *   0     : isLeaf (byte)
- *   1-4   : numKeys (int)
- *   5-16  : keys[3] (int[3])
- *   17-40 : values/children data (8*3=24 bytes para valores + 8 next = 32, ou 8*4=32 children)
- *            Para folha: values[3] (long[3]) + next (long)
- *            Para interno: children[4] (long[4])
- *   41-79 : padding (reservado para expansão)
- */
 public class ArvoreBMais {
 
     private static final int T          = 2;       // grau mínimo
@@ -41,7 +23,6 @@ public class ArvoreBMais {
         }
     }
 
-    // ─── Cabeçalho ──────────────────────────────────────────────────────────
     private long lerRaiz() throws IOException {
         try (RandomAccessFile raf = new RandomAccessFile(path, "r")) { return raf.readLong(); }
     }
@@ -59,15 +40,14 @@ public class ArvoreBMais {
         return pos;
     }
 
-    // ─── Estrutura de nó (in-memory) ────────────────────────────────────────
     private static class No {
         long   pos;
         boolean isLeaf;
         int    numKeys;
         int[]  keys     = new int[MAX_KEYS];
-        long[] values   = new long[MAX_KEYS];   // folha: posições no arquivo de dados
-        long[] children = new long[MAX_CHILDS]; // interno: endereços de filhos
-        long   next     = -1L;                  // folha: próxima folha
+        long[] values   = new long[MAX_KEYS];
+        long[] children = new long[MAX_CHILDS];
+        long   next     = -1L;
 
         No(long pos) { this.pos = pos; for (int i=0;i<MAX_CHILDS;i++) children[i]=-1L; }
     }
@@ -98,7 +78,6 @@ public class ArvoreBMais {
         }
     }
 
-    // ─── Busca ──────────────────────────────────────────────────────────────
     public long buscar(int key) throws IOException {
         long raiz = lerRaiz();
         if (raiz == -1L) return -1L;
@@ -115,7 +94,6 @@ public class ArvoreBMais {
         return buscarRec(lerNo(n.children[i]), key);
     }
 
-    // ─── Inserção ───────────────────────────────────────────────────────────
     public void inserir(int key, long value) throws IOException {
         long raiz = lerRaiz();
         if (raiz == -1L) {
@@ -203,7 +181,6 @@ public class ArvoreBMais {
         gravarNo(y); gravarNo(z); gravarNo(pai);
     }
 
-    // ─── Remoção lógica: marca valor como -1 ────────────────────────────────
     public void remover(int key) throws IOException {
         long raiz = lerRaiz();
         if (raiz == -1L) return;
@@ -219,16 +196,13 @@ public class ArvoreBMais {
         }
     }
 
-    // ─── Travessia em ordem (todas folhas) ──────────────────────────────────
     /** Retorna pares [key, value] em ordem crescente de chave */
     public List<long[]> listarOrdenado() throws IOException {
         List<long[]> lista = new ArrayList<>();
         long raiz = lerRaiz();
         if (raiz == -1L) return lista;
-        // Desce até a folha mais à esquerda
         No n = lerNo(raiz);
         while (!n.isLeaf) n = lerNo(n.children[0]);
-        // Percorre encadeamento de folhas
         while (n != null) {
             for (int i = 0; i < n.numKeys; i++) {
                 if (n.values[i] != -1L)

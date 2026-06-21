@@ -2,17 +2,9 @@ package clinica.index;
 
 import java.io.*;
 
-/**
- * Hash Extensível persistido em dois arquivos binários:
- *   .dir  → profundidade global + endereços dos buckets
- *   .bkt  → páginas de bucket com capacidade BUCKET_CAP entradas
- *
- * Chave: int  |  Valor: long (posição do registro no arquivo de dados)
- */
 public class HashExtensivel {
 
     private static final int BUCKET_CAP    = 4;
-    // Bucket page (bytes): 4 localDepth + 4 count + 4*BUCKET_CAP keys + 8*BUCKET_CAP values
     private static final int BUCKET_BYTES  = 4 + 4 + (4 * BUCKET_CAP) + (8 * BUCKET_CAP);  // = 56
 
     private final String dirPath;
@@ -24,7 +16,6 @@ public class HashExtensivel {
         if (!new File(dirPath).exists()) inicializar();
     }
 
-    // ─── Inicializa com profundidade 0 e 1 bucket vazio ────────────────────
     private void inicializar() throws IOException {
         try (DataOutputStream d = new DataOutputStream(new FileOutputStream(dirPath))) {
             d.writeInt(0);   // profundidade global
@@ -36,7 +27,6 @@ public class HashExtensivel {
         }
     }
 
-    // ─── Leitura do diretório ───────────────────────────────────────────────
     private int[] lerDiretorio() throws IOException {
         try (DataInputStream d = new DataInputStream(new FileInputStream(dirPath))) {
             int prof = d.readInt();
@@ -64,12 +54,11 @@ public class HashExtensivel {
     private void escreverDiretorio(int profGlobal, int[] addr) throws IOException {
         try (DataOutputStream d = new DataOutputStream(new FileOutputStream(dirPath))) {
             d.writeInt(profGlobal);
-            d.writeInt(addr.length);   // qtd buckets ≤ qtd entradas
+            d.writeInt(addr.length);
             for (int a : addr) d.writeInt(a);
         }
     }
 
-    // ─── Leitura/escrita de buckets ─────────────────────────────────────────
     private static class Bucket {
         int localDepth, count;
         int[]  keys;
@@ -96,12 +85,10 @@ public class HashExtensivel {
         for (int i = 0; i < BUCKET_CAP; i++) raf.writeLong(i < count ? vals[i] : -1L);
     }
 
-    // ─── Hash ───────────────────────────────────────────────────────────────
     private int hash(int key, int prof) {
         return (key * 54435761) >>> (32 - prof) & ((1 << prof) - 1);
     }
 
-    // ─── Busca ──────────────────────────────────────────────────────────────
     public long buscar(int key) throws IOException {
         int prof   = lerProfGlobal();
         int[] addr = lerDiretorio();
@@ -116,7 +103,6 @@ public class HashExtensivel {
         return -1L;
     }
 
-    // ─── Inserção ───────────────────────────────────────────────────────────
     public void inserir(int key, long value) throws IOException {
         inserirInterno(key, value);
     }
@@ -130,7 +116,6 @@ public class HashExtensivel {
         try (RandomAccessFile raf = new RandomAccessFile(bktPath, "rw")) {
             Bucket b = lerBucket(raf, addr[h]);
 
-            // Atualiza se já existe
             for (int i = 0; i < b.count; i++) {
                 if (b.keys[i] == key) { b.vals[i] = value; escreverBucket(raf, addr[h], b.localDepth, b.keys, b.vals, b.count); return; }
             }
@@ -141,13 +126,11 @@ public class HashExtensivel {
                 b.count++;
                 escreverBucket(raf, addr[h], b.localDepth, b.keys, b.vals, b.count);
             } else {
-                // Split
                 int novoId = lerQtdBuckets();
                 escreverBucket(raf, novoId, 0, new int[BUCKET_CAP], new long[BUCKET_CAP], 0);
 
                 int novaProf = b.localDepth + 1;
                 if (novaProf > prof) {
-                    // Dobra diretório
                     int novoTamanho = 1 << novaProf;
                     int[] novoAddr = new int[novoTamanho];
                     for (int i = 0; i < novoTamanho; i++) novoAddr[i] = addr[i / 2 < addr.length ? i / 2 : 0];
@@ -155,7 +138,6 @@ public class HashExtensivel {
                     prof  = novaProf;
                 }
 
-                // Redistribui entradas do bucket cheio + nova entrada
                 int[] ks = new int[b.count + 1];
                 long[] vs = new long[b.count + 1];
                 System.arraycopy(b.keys, 0, ks, 0, b.count);
@@ -175,15 +157,12 @@ public class HashExtensivel {
                 escreverBucket(raf, addr[h], novaProf, k0, v0, c0);
                 escreverBucket(raf, novoId,  novaProf, k1, v1, c1);
 
-                // Atualiza ponteiros no diretório
                 for (int i = 0; i < addr.length; i++) {
                     if (addr[i] == addr[h]) {
                         if ((i & 1) == 1) addr[i] = novoId;
                     }
                 }
-                // Atualiza contagem de buckets
                 escreverDiretorio(prof, addr);
-                // Re-grava qtdBuckets corretamente
                 atualizarQtdBuckets(novoId + 1);
                 return;
             }
@@ -198,7 +177,6 @@ public class HashExtensivel {
         }
     }
 
-    // ─── Remoção ────────────────────────────────────────────────────────────
     public void remover(int key) throws IOException {
         int prof   = lerProfGlobal();
         int[] addr = lerDiretorio();

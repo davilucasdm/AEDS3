@@ -3,22 +3,10 @@ package clinica.service;
 import clinica.dao.*;
 import clinica.index.OrdenacaoExterna;
 import clinica.model.*;
+import clinica.util.CasamentoPadroes;
 import java.io.IOException;
 import java.util.*;
 
-/**
- * Camada de serviço da Clínica Médica.
- *
- * Centraliza a lógica de negócio e integra todos os DAOs: - PacienteDAO,
- * MedicoDAO, EspecialidadeDAO, ConsultaDAO, UsuarioDAO - MedicoEspecialidadeDAO
- * ← FASE III: tabela N:N
- *
- * Responsabilidades desta classe: 1. Operações CRUD de todas as entidades. 2.
- * Relacionamento N:N (Médico ↔ Especialidade) via tabela intermediária. 3.
- * Integridade referencial (cascata de exclusão). 4. Ordenação externa
- * (intercalação) e travessia B+ para listagens ordenadas. 5. Autenticação de
- * usuários.
- */
 public class ClinicaService {
 
     private final PacienteDAO pacienteDAO;
@@ -27,6 +15,7 @@ public class ClinicaService {
     private final ConsultaDAO consultaDAO;
     private final UsuarioDAO usuarioDAO;
     private final MedicoEspecialidadeDAO meDAO;   // FASE III
+    private final CompactacaoService compactacaoService; // FASE IV
 
     private final String dataDir;
 
@@ -38,6 +27,7 @@ public class ClinicaService {
         consultaDAO = new ConsultaDAO(dataDir);
         usuarioDAO = new UsuarioDAO(dataDir);
         meDAO = new MedicoEspecialidadeDAO(dataDir);  // FASE III
+        compactacaoService = new CompactacaoService(dataDir); // FASE IV
 
         // Cria admin padrão se não existir nenhum usuário
         usuarioDAO.criarAdminSeNecessario();
@@ -46,6 +36,8 @@ public class ClinicaService {
     // ═══════════════════════════════════════════════════════════════════════
     // AUTENTICAÇÃO
     // ═══════════════════════════════════════════════════════════════════════
+    public String getDataDir() { return dataDir; }
+
     public boolean login(String login, String senha) throws IOException {
         return usuarioDAO.autenticar(login, senha);
     }
@@ -90,12 +82,7 @@ public class ClinicaService {
         return pacienteDAO.atualizar(p);
     }
 
-    /**
-     * Exclui paciente e todas as consultas associadas (integridade referencial
-     * 1:N).
-     */
     public boolean deletarPaciente(int id) throws IOException {
-        // Cascata: remove consultas do paciente
         for (Consulta c : consultaDAO.listarPorPaciente(id)) {
             consultaDAO.deletar(c.getId());
         }
@@ -132,16 +119,10 @@ public class ClinicaService {
         return medicoDAO.atualizar(m);
     }
 
-    /**
-     * Exclui médico, suas consultas (1:N) e seus vínculos de especialidade
-     * (N:N). Integridade referencial completa.
-     */
     public boolean deletarMedico(int id) throws IOException {
-        // Cascata 1:N → consultas do médico
         for (Consulta c : consultaDAO.listarPorMedico(id)) {
             consultaDAO.deletar(c.getId());
         }
-        // Cascata N:N → vínculos de especialidade
         removerTodosVinculosMedico(id);
         return medicoDAO.deletar(id);
     }
@@ -166,11 +147,7 @@ public class ClinicaService {
         return espDAO.atualizar(e);
     }
 
-    /**
-     * Exclui especialidade e todos os vínculos N:N associados.
-     */
     public boolean deletarEsp(int id) throws IOException {
-        // Cascata N:N → remove vínculos da especialidade
         removerTodosVinculosEspecialidade(id);
         return espDAO.deletar(id);
     }
@@ -210,28 +187,15 @@ public class ClinicaService {
     // ═══════════════════════════════════════════════════════════════════════
     // RELACIONAMENTO N:N — MÉDICO ↔ ESPECIALIDADE  (FASE III)
     // ═══════════════════════════════════════════════════════════════════════
-    /**
-     * Cria um vínculo entre médico e especialidade. Se o vínculo já existe,
-     * retorna o ID existente sem duplicar.
-     *
-     * @return ID do registro em MedicoEspecialidade
-     */
     public int vincularMedicoEsp(int idMedico, int idEspecialidade) throws IOException {
         MedicoEspecialidade me = new MedicoEspecialidade(0, true, idMedico, idEspecialidade);
         return meDAO.criar(me);
     }
 
-    /**
-     * Remove logicamente o vínculo entre médico e especialidade.
-     */
     public boolean desvincularMedicoEsp(int idMedico, int idEspecialidade) throws IOException {
         return meDAO.removerVinculo(idMedico, idEspecialidade);
     }
 
-    /**
-     * Retorna a lista de Especialidades associadas a um médico. Navegação N:N:
-     * Médico → Especialidades.
-     */
     public List<Especialidade> especialidadesDeMedico(int idMedico) throws IOException {
         List<Especialidade> resultado = new ArrayList<>();
         for (int idEsp : meDAO.idEspecialidadesPorMedico(idMedico)) {
@@ -243,10 +207,6 @@ public class ClinicaService {
         return resultado;
     }
 
-    /**
-     * Retorna a lista de Médicos que possuem determinada especialidade.
-     * Navegação N:N inversa: Especialidade → Médicos.
-     */
     public List<Medico> medicosPorEspecialidade(int idEspecialidade) throws IOException {
         List<Medico> resultado = new ArrayList<>();
         for (int idMed : meDAO.idMedicosPorEspecialidade(idEspecialidade)) {
@@ -258,19 +218,12 @@ public class ClinicaService {
         return resultado;
     }
 
-    /**
-     * Remove todos os vínculos N:N de um médico (cascata ao deletar médico).
-     */
     private void removerTodosVinculosMedico(int idMedico) throws IOException {
         for (int idEsp : meDAO.idEspecialidadesPorMedico(idMedico)) {
             meDAO.removerVinculo(idMedico, idEsp);
         }
     }
 
-    /**
-     * Remove todos os vínculos N:N de uma especialidade (cascata ao deletar
-     * especialidade).
-     */
     private void removerTodosVinculosEspecialidade(int idEspecialidade) throws IOException {
         for (int idMed : meDAO.idMedicosPorEspecialidade(idEspecialidade)) {
             meDAO.removerVinculo(idMed, idEspecialidade);
@@ -280,15 +233,8 @@ public class ClinicaService {
     // ═══════════════════════════════════════════════════════════════════════
     // ORDENAÇÃO EXTERNA (intercalação) + TRAVESSIA B+
     // ═══════════════════════════════════════════════════════════════════════
-    /**
-     * Ordena pacientes por nome via ordenação externa por intercalação. A
-     * Árvore B+ indexa por ID; a ordenação por nome usa OrdenacaoExterna.
-     *
-     * @return caminho do arquivo gerado
-     */
     public String ordenarPacientesPorNome(boolean desc) throws IOException {
         String saida = dataDir + "/pacientes_sorted.dat";
-        // Paciente: offset do nome = 4(id)+1(ativo) = 5, tamanho = 100 bytes
         var cmp = OrdenacaoExterna.porCampoString(5, 100);
         if (desc) {
             cmp = OrdenacaoExterna.decrescente(cmp);
@@ -297,19 +243,8 @@ public class ClinicaService {
         return saida;
     }
 
-    /**
-     * Ordena médicos por nome via Árvore B+ (travessia em ordem) + fallback
-     * para ordenação externa quando a B+ não indexa o campo nome.
-     *
-     * Como a B+ de médicos indexa por ID (não por nome), usamos
-     * OrdenacaoExterna para ordenar pelo campo nome — demonstrando ambas as
-     * funcionalidades.
-     *
-     * @return caminho do arquivo gerado
-     */
     public String ordenarMedicosPorNome(boolean desc) throws IOException {
         String saida = dataDir + "/medicos_sorted.dat";
-        // Medico: offset do nome = 4(id)+1(ativo) = 5, tamanho = 100 bytes
         var cmp = OrdenacaoExterna.porCampoString(5, 100);
         if (desc) {
             cmp = OrdenacaoExterna.decrescente(cmp);
@@ -318,15 +253,8 @@ public class ClinicaService {
         return saida;
     }
 
-    /**
-     * Ordena consultas por data via Árvore B+ (listarOrdenadas usa B+). Para
-     * fins de exportação, também gera arquivo ordenado via OrdenacaoExterna.
-     *
-     * @return caminho do arquivo gerado
-     */
     public String ordenarConsultasPorData(boolean desc) throws IOException {
         String saida = dataDir + "/consultas_sorted_data.dat";
-        // Consulta: offset da data = 4+1+4+4 = 13, tamanho = 10 bytes
         var cmp = OrdenacaoExterna.porCampoString(13, 10);
         if (desc) {
             cmp = OrdenacaoExterna.decrescente(cmp);
@@ -335,14 +263,8 @@ public class ClinicaService {
         return saida;
     }
 
-    /**
-     * Ordena consultas por valor via ordenação externa.
-     *
-     * @return caminho do arquivo gerado
-     */
     public String ordenarConsultasPorValor(boolean desc) throws IOException {
         String saida = dataDir + "/consultas_sorted_valor.dat";
-        // Consulta: offset do valor = 4+1+4+4+10+5 = 28, tipo double (8 bytes)
         var cmp = OrdenacaoExterna.porCampoDouble(28);
         if (desc) {
             cmp = OrdenacaoExterna.decrescente(cmp);
@@ -351,18 +273,97 @@ public class ClinicaService {
         return saida;
     }
 
-    /**
-     * Lista médicos em ordem crescente de ID usando travessia da Árvore B+. Sem
-     * ordenação em memória principal — usa o encadeamento de folhas da B+.
-     */
     public List<Medico> listarMedicosOrdenadosBPlus() throws IOException {
         return medicoDAO.listarOrdenados();
     }
 
-    /**
-     * Lista consultas em ordem via Árvore B+.
-     */
     public List<Consulta> listarConsultasOrdenadas() throws IOException {
         return consultaDAO.listarOrdenadas();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FASE IV — COMPACTAÇÃO (Huffman e LZW)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Gera backup compactado de todos os arquivos de dados do sistema
+     * (.dat, .hdir, .hbkt, .btree).
+     *
+     * @param nomeArquivo caminho do arquivo de saída (ex.: "data/backup_huffman.hbak")
+     * @param algoritmo   HUFFMAN ou LZW
+     * @return DTO com taxas de compressão por arquivo e total
+     */
+    public CompactacaoService.CompactacaoResult compactar(String nomeArquivo,
+            CompactacaoService.Algoritmo algoritmo) throws IOException {
+        return compactacaoService.compactar(nomeArquivo, algoritmo);
+    }
+
+    /**
+     * Restaura todos os arquivos de dados a partir de um backup compactado.
+     *
+     * @return lista dos nomes de arquivo restaurados
+     */
+    public List<String> descompactar(String nomeArquivo) throws IOException {
+        return compactacaoService.descompactar(nomeArquivo);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FASE IV — CASAMENTO DE PADRÕES (KMP e Boyer-Moore)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Busca pacientes cujo nome contém o padrão usando KMP (case-insensitive).
+     */
+    public List<Paciente> buscarPacienteKMP(String padrao) throws IOException {
+        List<Paciente> resultado = new ArrayList<>();
+        for (Paciente p : pacienteDAO.listarTodos()) {
+            if (p.getNome() != null
+                    && !CasamentoPadroes.kmpIgnoreCase(p.getNome(), padrao).isEmpty()) {
+                resultado.add(p);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Busca pacientes cujo nome contém o padrão usando Boyer-Moore (case-insensitive).
+     */
+    public List<Paciente> buscarPacienteBM(String padrao) throws IOException {
+        List<Paciente> resultado = new ArrayList<>();
+        for (Paciente p : pacienteDAO.listarTodos()) {
+            if (p.getNome() != null
+                    && !CasamentoPadroes.bmIgnoreCase(p.getNome(), padrao).isEmpty()) {
+                resultado.add(p);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Busca médicos cujo nome contém o padrão usando KMP (case-insensitive).
+     */
+    public List<Medico> buscarMedicoKMP(String padrao) throws IOException {
+        List<Medico> resultado = new ArrayList<>();
+        for (Medico m : medicoDAO.listarTodos()) {
+            if (m.getNome() != null
+                    && !CasamentoPadroes.kmpIgnoreCase(m.getNome(), padrao).isEmpty()) {
+                resultado.add(m);
+            }
+        }
+        return resultado;
+    }
+
+    /**
+     * Busca médicos cujo nome contém o padrão usando Boyer-Moore (case-insensitive).
+     */
+    public List<Medico> buscarMedicoBM(String padrao) throws IOException {
+        List<Medico> resultado = new ArrayList<>();
+        for (Medico m : medicoDAO.listarTodos()) {
+            if (m.getNome() != null
+                    && !CasamentoPadroes.bmIgnoreCase(m.getNome(), padrao).isEmpty()) {
+                resultado.add(m);
+            }
+        }
+        return resultado;
     }
 }

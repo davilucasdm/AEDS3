@@ -5,16 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Classe abstrata que encapsula toda a lógica de persistência em arquivo binário.
- *
- * Formato do arquivo:
- *   Header (12 bytes):
- *     [0-3]  int numRegistros  — registros ativos
- *     [4-7]  int ultimoId      — último ID gerado
- *     [8-11] int tamanhoReg    — tamanho de cada registro em bytes
- *   A partir do byte 12: registros de tamanho fixo (tamanhoReg bytes cada)
- */
 public abstract class BaseDAO<T> {
 
     protected static final int HEADER_SIZE = 12;
@@ -32,13 +22,12 @@ public abstract class BaseDAO<T> {
 
     private void criarArquivo() throws IOException {
         try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(filePath))) {
-            dos.writeInt(0);            // numRegistros
-            dos.writeInt(0);            // ultimoId
-            dos.writeInt(tamanhoReg);   // tamanhoReg
+            dos.writeInt(0);
+            dos.writeInt(0);
+            dos.writeInt(tamanhoReg);
         }
     }
 
-    // ─── Cabeçalho ──────────────────────────────────────────────────────────
     protected int[] lerHeader() throws IOException {
         try (DataInputStream dis = new DataInputStream(new FileInputStream(filePath))) {
             return new int[]{ dis.readInt(), dis.readInt(), dis.readInt() };
@@ -60,19 +49,15 @@ public abstract class BaseDAO<T> {
         return novoId;
     }
 
-    // ─── Posição do registro no arquivo ────────────────────────────────────
-    /** Offset do registro de índice zero-based 'pos' dentro do arquivo */
     protected long offsetReg(int pos) {
         return (long) HEADER_SIZE + (long) pos * tamanhoReg;
     }
 
-    /** Quantidade total de slots (ativos + excluídos logicamente) */
     protected int totalSlots() throws IOException {
         long tamanhoArq = new File(filePath).length();
         return (int) ((tamanhoArq - HEADER_SIZE) / tamanhoReg);
     }
 
-    // ─── Helpers para strings de tamanho fixo ──────────────────────────────
     protected static void writeStr(DataOutputStream dos, String s, int maxBytes) throws IOException {
         byte[] src = (s == null ? "" : s).getBytes(StandardCharsets.UTF_8);
         byte[] buf = new byte[maxBytes];
@@ -88,9 +73,6 @@ public abstract class BaseDAO<T> {
         return new String(buf, 0, end, StandardCharsets.UTF_8);
     }
 
-    // ─── CRUD genérico ──────────────────────────────────────────────────────
-
-    /** Persiste um novo registro e retorna o ID gerado */
     public int criar(T obj) throws IOException {
         int id = proximoId();
         atribuirId(obj, id);
@@ -107,7 +89,6 @@ public abstract class BaseDAO<T> {
         return id;
     }
 
-    /** Busca registro por ID (exclusão lógica é ignorada — retorna null se inativo) */
     public T buscarPorId(int id) throws IOException {
         int slots = totalSlots();
         try (RandomAccessFile raf = new RandomAccessFile(filePath, "r")) {
@@ -122,7 +103,6 @@ public abstract class BaseDAO<T> {
         return null;
     }
 
-    /** Lista todos os registros ativos */
     public List<T> listarTodos() throws IOException {
         List<T> lista = new ArrayList<>();
         int slots = totalSlots();
@@ -138,7 +118,6 @@ public abstract class BaseDAO<T> {
         return lista;
     }
 
-    /** Atualiza registro: encontra pelo ID e substitui */
     public boolean atualizar(T obj) throws IOException {
         int slots = totalSlots();
         try (RandomAccessFile raf = new RandomAccessFile(filePath, "rw")) {
@@ -158,7 +137,6 @@ public abstract class BaseDAO<T> {
         return false;
     }
 
-    /** Exclusão lógica: marca ativo=false no arquivo */
     public boolean deletar(int id) throws IOException {
         int slots = totalSlots();
         try (RandomAccessFile raf = new RandomAccessFile(filePath, "rw")) {
@@ -180,7 +158,6 @@ public abstract class BaseDAO<T> {
         return false;
     }
 
-    // ─── Métodos abstratos que cada DAO implementa ──────────────────────────
     protected abstract byte[] serializar(T obj) throws IOException;
     protected abstract T      desserializar(byte[] bytes) throws IOException;
     protected abstract int    getId(T obj);

@@ -2,6 +2,7 @@ package clinica.controller;
 
 import clinica.model.*;
 import clinica.service.ClinicaService;
+import clinica.service.CompactacaoService;
 import clinica.util.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -43,6 +44,8 @@ public class ClinicaHttpServer {
         server.createContext("/api/usuarios", this::handleUsuarios);
         server.createContext("/api/ordenar", this::handleOrdenar);
         server.createContext("/api/listar-ordenado", this::handleListarOrdenado);
+        server.createContext("/api/compactar", this::handleCompactar);    // FASE IV
+        server.createContext("/api/pesquisar", this::handlePesquisar);    // FASE IV
 
         server.start();
         System.out.println("Clínica iniciada em http://localhost:" + porta);
@@ -513,16 +516,6 @@ public class ClinicaHttpServer {
     }
 
     // ─── Listagem ordenada via Árvore B+ (Req 4) ────────────────────────────
-    /**
-     * GET /api/listar-ordenado?entidade=medicos GET
-     * /api/listar-ordenado?entidade=consultas
-     *
-     * Retorna os registros em ordem crescente de ID diretamente pela travessia
-     * das folhas encadeadas da Árvore B+, sem ordenação em memória principal
-     * (sem Collections.sort ou Arrays.sort).
-     *
-     * Demonstra o Requisito 4 da Fase III.
-     */
     private void handleListarOrdenado(HttpExchange ex) throws IOException {
         cors(ex);
         if ("OPTIONS".equals(ex.getRequestMethod())) {
@@ -549,6 +542,113 @@ public class ClinicaHttpServer {
             respondJson(ex, json);
         } catch (IllegalArgumentException e) {
             respond(ex, 400, "application/json", JsonParser.err(e.getMessage()));
+        } catch (Exception e) {
+            respond(ex, 500, "application/json", JsonParser.err(e.getMessage()));
+        }
+    }
+
+    // ─── Compactação — Fase IV ─────────────────────────────────────────────────
+    /**
+     * POST /api/compactar  { "algoritmo": "HUFFMAN"|"LZW" }
+     *   → gera backup compactado e retorna taxas de compressão
+     *
+     * GET  /api/compactar?arquivo=backup_huffman.hbak
+     *   → restaura arquivos de dados a partir do backup
+     */
+    private void handleCompactar(HttpExchange ex) throws IOException {
+        cors(ex);
+        if ("OPTIONS".equals(ex.getRequestMethod())) {
+            respond(ex, 204, "text/plain", "");
+            return;
+        }
+        if (!autenticado(ex)) {
+            respond(ex, 401, "application/json", JsonParser.err("Não autenticado"));
+            return;
+        }
+
+        try {
+            if ("POST".equals(ex.getRequestMethod())) {
+                // Compactar
+                Map<String, String> b = JsonParser.parse(readBody(ex));
+                String algStr = b.getOrDefault("algoritmo", "HUFFMAN").toUpperCase();
+                CompactacaoService.Algoritmo alg;
+                try {
+                    alg = CompactacaoService.Algoritmo.valueOf(algStr);
+                } catch (Exception e) {
+                    respond(ex, 400, "application/json", JsonParser.err("algoritmo inválido: use HUFFMAN ou LZW"));
+                    return;
+                }
+
+                String nomeArq = svc.getDataDir() + "/backup_" + algStr.toLowerCase() + ".hbak";
+                CompactacaoService.CompactacaoResult res = svc.compactar(nomeArq, alg);
+                respondJson(ex, res.toJson());
+
+            } else if ("GET".equals(ex.getRequestMethod())) {
+                // Descompactar / restaurar
+                String arquivo = queryParam(ex, "arquivo");
+                if (arquivo == null || arquivo.isEmpty()) {
+                    respond(ex, 400, "application/json", JsonParser.err("Parâmetro 'arquivo' obrigatório"));
+                    return;
+                }
+                String caminho = svc.getDataDir() + "/" + arquivo;
+                List<String> restaurados = svc.descompactar(caminho);
+                StringBuilder json = new StringBuilder("[");
+                for (int i = 0; i < restaurados.size(); i++) {
+                    if (i > 0) json.append(",");
+                    json.append("\"").append(restaurados.get(i)).append("\"");
+                }
+                json.append("]");
+                respondJson(ex, "{\"ok\":true,\"restaurados\":" + json + "}");
+
+            } else {
+                respond(ex, 405, "application/json", JsonParser.err("Método inválido"));
+            }
+        } catch (Exception e) {
+            respond(ex, 500, "application/json", JsonParser.err(e.getMessage()));
+        }
+    }
+
+    // ─── Pesquisa textual (KMP e BM) — Fase IV ────────────────────────────────
+    /**
+     * GET /api/pesquisar?entidade=pacientes&algoritmo=KMP&q=ana
+     * GET /api/pesquisar?entidade=medicos&algoritmo=BM&q=silva
+     */
+    private void handlePesquisar(HttpExchange ex) throws IOException {
+        cors(ex);
+        if ("OPTIONS".equals(ex.getRequestMethod())) {
+            respond(ex, 204, "text/plain", "");
+            return;
+        }
+        if (!autenticado(ex)) {
+            respond(ex, 401, "application/json", JsonParser.err("Não autenticado"));
+            return;
+        }
+        if (!"GET".equals(ex.getRequestMethod())) {
+            respond(ex, 405, "application/json", JsonParser.err("Método inválido"));
+            return;
+        }
+
+        String entidade  = queryParam(ex, "entidade");
+        String algoritmo = queryParam(ex, "algoritmo");
+        String q         = queryParam(ex, "q");
+
+        if (q == null || q.isEmpty()) {
+            respond(ex, 400, "application/json", JsonParser.err("Parâmetro 'q' obrigatório"));
+            return;
+        }
+
+        try {
+            boolean usaBM = "BM".equalsIgnoreCase(algoritmo) || "BOYERMOORE".equalsIgnoreCase(algoritmo);
+            String json;
+            if ("medicos".equalsIgnoreCase(entidade)) {
+                List<Medico> res = usaBM ? svc.buscarMedicoBM(q) : svc.buscarMedicoKMP(q);
+                json = listJson(res, Medico::toJson);
+            } else {
+                // default: pacientes
+                List<Paciente> res = usaBM ? svc.buscarPacienteBM(q) : svc.buscarPacienteKMP(q);
+                json = listJson(res, Paciente::toJson);
+            }
+            respondJson(ex, json);
         } catch (Exception e) {
             respond(ex, 500, "application/json", JsonParser.err(e.getMessage()));
         }

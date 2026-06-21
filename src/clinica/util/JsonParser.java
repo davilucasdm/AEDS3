@@ -3,18 +3,8 @@ package clinica.util;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Parser JSON mínimo para leitura de objetos planos {"chave":"valor",...}. Não
- * depende de bibliotecas externas. Suporta strings, números e booleans como
- * valores — tudo convertido para String pelo chamador.
- */
 public class JsonParser {
 
-    /**
-     * Parseia um objeto JSON simples e retorna um Map<String,String>. Valores
-     * numéricos e booleanos são retornados como String. Não suporta arrays nem
-     * objetos aninhados.
-     */
     public static Map<String, String> parse(String json) {
         Map<String, String> map = new LinkedHashMap<>();
         if (json == null || json.isBlank()) {
@@ -22,7 +12,6 @@ public class JsonParser {
         }
 
         json = json.trim();
-        // Remove chaves externas { }
         if (json.startsWith("{")) {
             json = json.substring(1);
         }
@@ -32,7 +21,6 @@ public class JsonParser {
 
         int i = 0;
         while (i < json.length()) {
-            // Pula espaços
             while (i < json.length() && Character.isWhitespace(json.charAt(i))) {
                 i++;
             }
@@ -40,7 +28,6 @@ public class JsonParser {
                 break;
             }
 
-            // Lê chave (string entre aspas)
             if (json.charAt(i) != '"') {
                 i++;
                 continue;
@@ -55,7 +42,6 @@ public class JsonParser {
             String key = json.substring(keyStart, i);
             i++; // fecha "
 
-            // Pula ':'
             while (i < json.length() && json.charAt(i) != ':') {
                 i++;
             }
@@ -64,14 +50,12 @@ public class JsonParser {
                 i++;
             }
 
-            // Lê valor
             String value;
             if (i >= json.length()) {
                 break;
             }
             char c = json.charAt(i);
             if (c == '"') {
-                // Valor string
                 i++;
                 StringBuilder sb = new StringBuilder();
                 while (i < json.length() && json.charAt(i) != '"') {
@@ -101,7 +85,6 @@ public class JsonParser {
                 value = sb.toString();
                 i++; // fecha "
             } else {
-                // Valor não-string (número, boolean, null)
                 int start = i;
                 while (i < json.length() && json.charAt(i) != ',' && json.charAt(i) != '}') {
                     i++;
@@ -111,7 +94,6 @@ public class JsonParser {
 
             map.put(key, value);
 
-            // Pula vírgula separadora
             while (i < json.length() && (json.charAt(i) == ',' || Character.isWhitespace(json.charAt(i)))) {
                 i++;
             }
@@ -119,16 +101,10 @@ public class JsonParser {
         return map;
     }
 
-    /**
-     * Gera resposta JSON de sucesso simples: {"ok":true,"msg":"..."}
-     */
     public static String ok(String msg) {
         return "{\"ok\":true,\"msg\":\"" + esc(msg) + "\"}";
     }
 
-    /**
-     * Gera resposta JSON de erro simples: {"ok":false,"erro":"..."}
-     */
     public static String err(String msg) {
         return "{\"ok\":false,\"erro\":\"" + esc(msg == null ? "Erro desconhecido" : msg) + "\"}";
     }
