@@ -42,11 +42,36 @@ public class UsuarioDAO extends BaseDAO<Usuario> {
         return CriptoXOR.verificar(senhaPlana, u.getSenha());
     }
 
-    /** Cria usuário admin padrão se não existir nenhum usuário */
+    /**
+     * Garante que existe um usuário "admin" com senha "admin123" funcional.
+     *
+     * Cobre dois cenários:
+     *   1) Banco de usuários vazio (primeira execução) → cria o admin.
+     *   2) Já existe um registro de login "admin", mas oriundo de uma versão
+     *      anterior do sistema com uma chave de criptografia diferente
+     *      (a senha cifrada no arquivo não corresponde mais à chave XOR
+     *      atual) → corrige a senha do admin existente em vez de duplicar.
+     *
+     * Isso evita o caso de "login admin/admin123 não funciona" quando o
+     * arquivo data/usuarios.dat foi criado por uma versão antiga do
+     * CriptoXOR (chave alterada) e ficou com um hash incompatível.
+     */
     public void criarAdminSeNecessario() throws IOException {
-        if (listarTodos().isEmpty()) {
+        Usuario existente = buscarPorLogin("admin");
+        if (existente == null) {
             Usuario admin = new Usuario(0, true, "admin", "admin123", "ADMIN");
             criar(admin);
+            return;
+        }
+        // Já existe um "admin" — verifica se a senha "admin123" autentica
+        // corretamente com a chave de criptografia ATUAL.
+        if (!CriptoXOR.verificar("admin123", existente.getSenha())) {
+            // Hash incompatível (provavelmente gerado com chave XOR antiga).
+            // Corrige a senha do admin existente, preservando o registro.
+            existente.setSenha(CriptoXOR.cifrar("admin123"));
+            atualizar(existente);
+            System.out.println("[UsuarioDAO] Senha do admin estava com hash incompatível "
+                    + "(provavelmente de uma chave XOR antiga). Senha redefinida para o padrão.");
         }
     }
 
