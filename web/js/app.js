@@ -44,6 +44,18 @@ function toast(msg, type = 'success') {
   setTimeout(() => el.remove(), 3500);
 }
 
+// ── Navegação entre telas de Login / Registro ────────────────────────────────
+function mostrarTelaRegistro() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('registro-screen').style.display = 'flex';
+  document.getElementById('registro-error').style.display = 'none';
+}
+function mostrarTelaLogin() {
+  document.getElementById('registro-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-error').style.display = 'none';
+}
+
 // ── Login ────────────────────────────────────────────────────────────────────
 async function doLogin() {
   const login = document.getElementById('inp-login').value.trim();
@@ -54,21 +66,61 @@ async function doLogin() {
   try {
     const res = await API.post('/api/login', { login, senha });
     if (res.ok) {
-      API.token = res.token;
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('user', JSON.stringify({ login: res.login, role: res.role }));
-      State.user = { login: res.login, role: res.role };
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'flex';
-      initApp();
+      entrarNoApp(res);
     } else {
-      errEl.textContent = res.msg || 'Credenciais inválidas';
+      errEl.textContent = res.erro || res.msg || 'Credenciais inválidas';
       errEl.style.display = 'block';
     }
   } catch (e) {
     errEl.textContent = 'Erro de conexão com o servidor';
     errEl.style.display = 'block';
   }
+}
+
+// ── Registro ──────────────────────────────────────────────────────────────────
+async function doRegistrar() {
+  const login = document.getElementById('reg-login').value.trim();
+  const senha = document.getElementById('reg-senha').value;
+  const role  = document.getElementById('reg-role').value;
+  const errEl = document.getElementById('registro-error');
+  errEl.style.display = 'none';
+
+  if (login.length < 3) {
+    errEl.textContent = 'Login deve ter ao menos 3 caracteres';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (senha.length < 4) {
+    errEl.textContent = 'Senha deve ter ao menos 4 caracteres';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    const res = await API.post('/api/registrar', { login, senha, role });
+    if (res.ok) {
+      toast('Conta criada com sucesso!');
+      entrarNoApp(res);
+    } else {
+      errEl.textContent = res.erro || res.msg || 'Não foi possível criar a conta';
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    errEl.textContent = 'Erro de conexão com o servidor';
+    errEl.style.display = 'block';
+  }
+}
+
+// ── Helper comum: entra no app após login ou registro ────────────────────────
+function entrarNoApp(res) {
+  API.token = res.token;
+  localStorage.setItem('token', res.token);
+  localStorage.setItem('user', JSON.stringify({ login: res.login, role: res.role }));
+  State.user = { login: res.login, role: res.role };
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('registro-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  initApp();
 }
 
 function doLogout() {
@@ -123,6 +175,7 @@ const pageTitles = {
   medicos: 'Médicos',
   especialidades: 'Especialidades',
   consultas: 'Consultas',
+  backup: 'Backup & Compactação',
   usuarios: 'Usuários'
 };
 
@@ -212,6 +265,10 @@ const pages = {
           <span class="search-icon">🔍</span>
           <input id="search-pac" placeholder="Buscar por nome..." oninput="filterPacientes(this.value)">
         </div>
+        <select id="search-pac-algo" class="btn btn-ghost" title="Algoritmo de casamento de padrões">
+          <option value="KMP">KMP</option>
+          <option value="BM">Boyer-Moore</option>
+        </select>
         <button class="btn btn-ghost btn-sm" onclick="ordenarExterna('pacientes','nome','asc')" title="Ordenar A→Z">↑ Nome</button>
         <button class="btn btn-ghost btn-sm" onclick="ordenarExterna('pacientes','nome','desc')" title="Ordenar Z→A">↓ Nome</button>
       </div>
@@ -237,6 +294,10 @@ const pages = {
           <span class="search-icon">🔍</span>
           <input id="search-med" placeholder="Buscar por nome..." oninput="filterMedicos(this.value)">
         </div>
+        <select id="search-med-algo" class="btn btn-ghost" title="Algoritmo de casamento de padrões">
+          <option value="KMP">KMP</option>
+          <option value="BM">Boyer-Moore</option>
+        </select>
         <button class="btn btn-ghost btn-sm" onclick="ordenarExterna('medicos','nome','asc')">↑ Nome</button>
         <button class="btn btn-ghost btn-sm" onclick="ordenarExterna('medicos','nome','desc')">↓ Nome</button>
       </div>
@@ -292,6 +353,36 @@ const pages = {
         <button class="btn btn-ghost btn-sm" onclick="ordenarExterna('consultas','valor','desc')">↓ Valor</button>
       </div>
       <div id="con-table" class="table-wrap card">${renderConsultas(list)}</div>`;
+  },
+
+  // ── Backup & Compactação (Fase IV) ────────────────────────────────────────
+  async backup() {
+    document.getElementById('content').innerHTML = `
+      <div class="page-header">
+        <div><div class="page-title">Backup &amp; Compactação</div>
+          <div class="page-sub">Compacte ou restaure todos os arquivos de dados do sistema</div></div>
+      </div>
+
+      <div class="card" style="padding:20px;margin-bottom:18px">
+        <div style="font-weight:600;margin-bottom:12px">Gerar backup compactado</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="compactar('HUFFMAN')">Compactar (Huffman)</button>
+          <button class="btn btn-primary" onclick="compactar('LZW')">Compactar (LZW)</button>
+        </div>
+        <div id="backup-resultado" style="margin-top:16px"></div>
+      </div>
+
+      <div class="card" style="padding:20px">
+        <div style="font-weight:600;margin-bottom:12px">Restaurar a partir de um backup</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="restore-arquivo" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:inherit">
+            <option value="backup_huffman.hbak">backup_huffman.hbak</option>
+            <option value="backup_lzw.hbak">backup_lzw.hbak</option>
+          </select>
+          <button class="btn btn-ghost" onclick="restaurar()">Restaurar</button>
+        </div>
+        <div id="restore-resultado" style="margin-top:16px"></div>
+      </div>`;
   },
 
   // ── Usuários ──────────────────────────────────────────────────────────────
@@ -418,14 +509,31 @@ function roleBadge(r) {
 }
 function escHtml(s) { return (s||'').replace(/'/g,"\\'"); }
 
-// ── Filtros ──────────────────────────────────────────────────────────────────
-function filterPacientes(q) {
-  const f = (window._pacientes || []).filter(p => !q || p.nome?.toLowerCase().includes(q.toLowerCase()));
-  document.getElementById('pac-table').innerHTML = renderPacientes(f);
+// ── Filtros (pesquisa textual via KMP/Boyer-Moore — Fase IV) ─────────────────
+async function filterPacientes(q) {
+  const tabela = document.getElementById('pac-table');
+  if (!q) { tabela.innerHTML = renderPacientes(window._pacientes || []); return; }
+  const algo = document.getElementById('search-pac-algo')?.value || 'KMP';
+  try {
+    const res = await API.get(`/api/pesquisar?entidade=pacientes&algoritmo=${algo}&q=${encodeURIComponent(q)}`);
+    tabela.innerHTML = renderPacientes(Array.isArray(res) ? res : []);
+  } catch (e) {
+    // fallback local caso a API falhe
+    const f = (window._pacientes || []).filter(p => p.nome?.toLowerCase().includes(q.toLowerCase()));
+    tabela.innerHTML = renderPacientes(f);
+  }
 }
-function filterMedicos(q) {
-  const f = (window._medicos || []).filter(m => !q || m.nome?.toLowerCase().includes(q.toLowerCase()));
-  document.getElementById('med-table').innerHTML = renderMedicos(f);
+async function filterMedicos(q) {
+  const tabela = document.getElementById('med-table');
+  if (!q) { tabela.innerHTML = renderMedicos(window._medicos || []); return; }
+  const algo = document.getElementById('search-med-algo')?.value || 'KMP';
+  try {
+    const res = await API.get(`/api/pesquisar?entidade=medicos&algoritmo=${algo}&q=${encodeURIComponent(q)}`);
+    tabela.innerHTML = renderMedicos(Array.isArray(res) ? res : []);
+  } catch (e) {
+    const f = (window._medicos || []).filter(m => m.nome?.toLowerCase().includes(q.toLowerCase()));
+    tabela.innerHTML = renderMedicos(f);
+  }
 }
 function filterConsultas(q) {
   const f = (window._consultas || []).filter(c => !q || c.status?.toLowerCase().includes(q.toLowerCase()));
@@ -515,7 +623,7 @@ function openModal(type, data) {
           <div class="form-group"><label>Login</label><input id="f-login"></div>
           <div class="form-group"><label>Senha</label><input id="f-senha" type="password"></div>
           <div class="form-group"><label>Perfil</label>
-            <select id="f-role"><option>RECEPCIONISTA</option><option>ADMIN</option></select></div>
+            <select id="f-role"><option>RECEPCIONISTA</option><option>MEDICO</option><option>ADMIN</option></select></div>
         </div>`;
       foot.innerHTML = `<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
         <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>`;
@@ -536,13 +644,13 @@ async function salvarPaciente() {
   const body = { nome: v('f-nome'), cpf: v('f-cpf'), dataNascimento: v('f-dnasc'), email: v('f-email'), telefones: v('f-tels'), endereco: v('f-end') };
   const res = _editId ? await API.put(`/api/pacientes/${_editId}`, body) : await API.post('/api/pacientes', body);
   if (res.ok) { toast(_editId ? 'Paciente atualizado!' : 'Paciente criado!'); closeModal(); pages.pacientes(); }
-  else toast(res.msg || 'Erro', 'error');
+  else toast(res.msg || res.erro || 'Erro', 'error');
 }
 function editarPaciente(p) { openModal('paciente', p); }
 async function deletarPaciente(id) {
   if (!confirm('Excluir paciente?')) return;
   const res = await API.del(`/api/pacientes/${id}`);
-  if (res.ok) { toast('Paciente removido!'); pages.pacientes(); } else toast(res.msg,'error');
+  if (res.ok) { toast('Paciente removido!'); pages.pacientes(); } else toast(res.msg||res.erro,'error');
 }
 
 // ── CRUD Médico ───────────────────────────────────────────────────────────────
@@ -550,13 +658,13 @@ async function salvarMedico() {
   const body = { nome: v('f-nome'), crm: v('f-crm'), email: v('f-email'), telefones: v('f-tels') };
   const res = _editId ? await API.put(`/api/medicos/${_editId}`, body) : await API.post('/api/medicos', body);
   if (res.ok) { toast(_editId ? 'Médico atualizado!' : 'Médico criado!'); closeModal(); pages.medicos(); }
-  else toast(res.msg || 'Erro', 'error');
+  else toast(res.msg || res.erro || 'Erro', 'error');
 }
 function editarMedico(m) { openModal('medico', m); }
 async function deletarMedico(id) {
   if (!confirm('Excluir médico?')) return;
   const res = await API.del(`/api/medicos/${id}`);
-  if (res.ok) { toast('Médico removido!'); pages.medicos(); } else toast(res.msg,'error');
+  if (res.ok) { toast('Médico removido!'); pages.medicos(); } else toast(res.msg||res.erro,'error');
 }
 
 // ── Especialidades de um médico (N:N) ─────────────────────────────────────────
@@ -593,12 +701,12 @@ async function vincularEsp(idMedico, nomeMedico) {
   if (!idEsp) return;
   const res = await API.post('/api/vinculos', { idMedico, idEspecialidade: idEsp });
   if (res.ok) { toast('Especialidade vinculada!'); verEspecialidades(idMedico, nomeMedico); }
-  else toast(res.msg,'error');
+  else toast(res.msg||res.erro,'error');
 }
 async function desvincularEsp(idMedico, idEsp, nomeMedico) {
   const res = await API.del('/api/vinculos', { idMedico, idEspecialidade: idEsp });
   if (res.ok) { toast('Desvinculado!'); verEspecialidades(idMedico, nomeMedico); }
-  else toast(res.msg,'error');
+  else toast(res.msg||res.erro,'error');
 }
 
 // ── CRUD Especialidade ────────────────────────────────────────────────────────
@@ -606,13 +714,13 @@ async function salvarEsp() {
   const body = { nome: v('f-nome'), descricao: v('f-desc') };
   const res = _editId ? await API.put(`/api/especialidades/${_editId}`, body) : await API.post('/api/especialidades', body);
   if (res.ok) { toast(_editId ? 'Especialidade atualizada!' : 'Especialidade criada!'); closeModal(); pages.especialidades(); }
-  else toast(res.msg || 'Erro', 'error');
+  else toast(res.msg || res.erro || 'Erro', 'error');
 }
 function editarEsp(e) { openModal('especialidade', e); }
 async function deletarEsp(id) {
   if (!confirm('Excluir especialidade?')) return;
   const res = await API.del(`/api/especialidades/${id}`);
-  if (res.ok) { toast('Especialidade removida!'); pages.especialidades(); } else toast(res.msg,'error');
+  if (res.ok) { toast('Especialidade removida!'); pages.especialidades(); } else toast(res.msg||res.erro,'error');
 }
 
 // ── CRUD Consulta ─────────────────────────────────────────────────────────────
@@ -624,13 +732,13 @@ async function salvarConsulta() {
   };
   const res = _editId ? await API.put(`/api/consultas/${_editId}`, body) : await API.post('/api/consultas', body);
   if (res.ok) { toast(_editId ? 'Consulta atualizada!' : 'Consulta criada!'); closeModal(); pages.consultas(); }
-  else toast(res.msg || 'Erro', 'error');
+  else toast(res.msg || res.erro || 'Erro', 'error');
 }
 function editarConsulta(c) { openModal('consulta', c); }
 async function deletarConsulta(id) {
   if (!confirm('Excluir consulta?')) return;
   const res = await API.del(`/api/consultas/${id}`);
-  if (res.ok) { toast('Consulta removida!'); pages.consultas(); } else toast(res.msg,'error');
+  if (res.ok) { toast('Consulta removida!'); pages.consultas(); } else toast(res.msg||res.erro,'error');
 }
 
 // ── CRUD Usuário ──────────────────────────────────────────────────────────────
@@ -638,12 +746,12 @@ async function salvarUsuario() {
   const body = { login: v('f-login'), senha: v('f-senha'), role: v('f-role') };
   const res = await API.post('/api/usuarios', body);
   if (res.ok) { toast('Usuário criado!'); closeModal(); pages.usuarios(); }
-  else toast(res.msg || 'Erro', 'error');
+  else toast(res.msg || res.erro || 'Erro', 'error');
 }
 async function deletarUsuario(id) {
   if (!confirm('Excluir usuário?')) return;
   const res = await API.del(`/api/usuarios/${id}`);
-  if (res.ok) { toast('Usuário removido!'); pages.usuarios(); } else toast(res.msg,'error');
+  if (res.ok) { toast('Usuário removido!'); pages.usuarios(); } else toast(res.msg||res.erro,'error');
 }
 
 // ── Ordenação Externa ─────────────────────────────────────────────────────────
@@ -654,10 +762,56 @@ async function ordenarExterna(entidade, campo, ordem) {
     if (res.ok) {
       toast(`Ordenação concluída! Arquivo: ${res.arquivo.split('/').pop()}`, 'success');
     } else {
-      toast(res.msg || 'Erro na ordenação', 'error');
+      toast(res.msg || res.erro || 'Erro na ordenação', 'error');
     }
   } catch (e) {
     toast('Erro ao comunicar com o servidor', 'error');
+  }
+}
+
+// ── Compactação / Backup (Fase IV) ────────────────────────────────────────────
+async function compactar(algoritmo) {
+  const area = document.getElementById('backup-resultado');
+  area.innerHTML = `<div style="color:var(--text3);font-size:13px">Compactando com ${algoritmo}...</div>`;
+  try {
+    const res = await API.post('/api/compactar', { algoritmo });
+    if (res.algoritmo) {
+      const taxaPct = (res.taxaGeral * 100).toFixed(1);
+      area.innerHTML = `
+        <div style="background:var(--successBg);border:1px solid var(--success);border-radius:8px;padding:14px 16px;font-size:13px">
+          <div style="font-weight:600;color:var(--success);margin-bottom:6px">✓ Backup gerado: ${res.arquivoGerado}</div>
+          <div>Original: ${res.totalOriginalBytes} bytes → Compactado: ${res.totalCompactadoBytes} bytes</div>
+          <div>Taxa de compressão: <b>${taxaPct}%</b></div>
+        </div>`;
+      toast(`Compactação ${algoritmo} concluída! Taxa: ${taxaPct}%`);
+    } else {
+      area.innerHTML = `<div style="color:var(--danger);font-size:13px">${res.erro || res.msg || 'Erro na compactação'}</div>`;
+      toast(res.erro || res.msg || 'Erro na compactação', 'error');
+    }
+  } catch (e) {
+    area.innerHTML = `<div style="color:var(--danger);font-size:13px">Erro de conexão com o servidor</div>`;
+  }
+}
+
+async function restaurar() {
+  const arquivo = document.getElementById('restore-arquivo').value;
+  const area = document.getElementById('restore-resultado');
+  area.innerHTML = `<div style="color:var(--text3);font-size:13px">Restaurando...</div>`;
+  try {
+    const res = await API.get(`/api/compactar?arquivo=${encodeURIComponent(arquivo)}`);
+    if (res.ok) {
+      area.innerHTML = `
+        <div style="background:var(--successBg);border:1px solid var(--success);border-radius:8px;padding:14px 16px;font-size:13px">
+          <div style="font-weight:600;color:var(--success);margin-bottom:6px">✓ ${res.restaurados.length} arquivo(s) restaurado(s)</div>
+          <div style="color:var(--text2)">${res.restaurados.join(', ')}</div>
+        </div>`;
+      toast('Restauração concluída!');
+    } else {
+      area.innerHTML = `<div style="color:var(--danger);font-size:13px">${res.erro || res.msg || 'Erro na restauração'}</div>`;
+      toast(res.erro || res.msg || 'Erro na restauração', 'error');
+    }
+  } catch (e) {
+    area.innerHTML = `<div style="color:var(--danger);font-size:13px">Erro de conexão com o servidor</div>`;
   }
 }
 
@@ -667,6 +821,7 @@ function v(id) { const el = document.getElementById(id); return el ? el.value.tr
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inp-senha').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('reg-senha').addEventListener('keydown', e => { if (e.key === 'Enter') doRegistrar(); });
 
   if (API.token && State.user) {
     document.getElementById('login-screen').style.display = 'none';

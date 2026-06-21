@@ -36,6 +36,7 @@ public class ClinicaHttpServer {
 
         // API REST
         server.createContext("/api/login", this::handleLogin);
+        server.createContext("/api/registrar", this::handleRegistrar);
         server.createContext("/api/pacientes", this::handlePacientes);
         server.createContext("/api/medicos", this::handleMedicos);
         server.createContext("/api/especialidades", this::handleEspecialidades);
@@ -123,7 +124,66 @@ public class ClinicaHttpServer {
         }
     }
 
-    // ─── Pacientes ──────────────────────────────────────────────────────────
+    // ─── Registro de novo usuário (auto-cadastro público) ───────────────────
+    /**
+     * POST /api/registrar  { "login": "...", "senha": "...", "role": "RECEPCIONISTA" }
+     *
+     * Rota pública (não exige autenticação), permitindo que um novo usuário
+     * crie sua própria conta. O perfil "role" é opcional — se omitido ou
+     * inválido, assume RECEPCIONISTA. Não é possível se autocadastrar como
+     * ADMIN por esta rota (uso de ADMIN é restrito à gestão via /api/usuarios
+     * por um usuário já autenticado como ADMIN).
+     */
+    private void handleRegistrar(HttpExchange ex) throws IOException {
+        cors(ex);
+        if ("OPTIONS".equals(ex.getRequestMethod())) {
+            respond(ex, 204, "text/plain", "");
+            return;
+        }
+        if (!"POST".equals(ex.getRequestMethod())) {
+            respond(ex, 405, "application/json", JsonParser.err("Método inválido"));
+            return;
+        }
+
+        Map<String, String> body = JsonParser.parse(readBody(ex));
+        String login = body.getOrDefault("login", "").trim();
+        String senha = body.getOrDefault("senha", "");
+        String roleSolicitado = body.getOrDefault("role", "RECEPCIONISTA").trim().toUpperCase();
+
+        if (login.isEmpty() || senha.isEmpty()) {
+            respond(ex, 400, "application/json", JsonParser.err("Login e senha são obrigatórios"));
+            return;
+        }
+        if (login.length() < 3) {
+            respond(ex, 400, "application/json", JsonParser.err("Login deve ter ao menos 3 caracteres"));
+            return;
+        }
+        if (senha.length() < 4) {
+            respond(ex, 400, "application/json", JsonParser.err("Senha deve ter ao menos 4 caracteres"));
+            return;
+        }
+        // Autocadastro nunca cria ADMIN — apenas RECEPCIONISTA ou MEDICO
+        String role = ("MEDICO".equals(roleSolicitado)) ? "MEDICO" : "RECEPCIONISTA";
+
+        try {
+            if (svc.buscarUsuarioPorLogin(login) != null) {
+                respond(ex, 409, "application/json", JsonParser.err("Este login já está em uso"));
+                return;
+            }
+            Usuario novo = new Usuario(0, true, login, senha, role);
+            int id = svc.criarUsuario(novo);
+
+            // Login automático após registro
+            String token = UUID.randomUUID().toString();
+            sessoes.put(token, login);
+
+            respond(ex, 200, "application/json",
+                    "{\"ok\":true,\"id\":" + id + ",\"token\":\"" + token
+                    + "\",\"role\":\"" + role + "\",\"login\":\"" + login + "\"}");
+        } catch (Exception e) {
+            respond(ex, 500, "application/json", JsonParser.err(e.getMessage()));
+        }
+    }
     private void handlePacientes(HttpExchange ex) throws IOException {
         cors(ex);
         if ("OPTIONS".equals(ex.getRequestMethod())) {
