@@ -175,6 +175,7 @@ const pageTitles = {
   medicos: 'Médicos',
   especialidades: 'Especialidades',
   consultas: 'Consultas',
+  pesquisar: 'Pesquisar por padrão (KMP / BM)',
   backup: 'Backup & Compactação',
   usuarios: 'Usuários'
 };
@@ -355,7 +356,47 @@ const pages = {
       <div id="con-table" class="table-wrap card">${renderConsultas(list)}</div>`;
   },
 
-  // ── Backup & Compactação (Fase IV) ────────────────────────────────────────
+  // ── Pesquisar por padrão (KMP / BM) — Fase V ──────────────────────────────
+  async pesquisar() {
+    document.getElementById('content').innerHTML = `
+      <div class="page-header">
+        <div><div class="page-title">Pesquisar por padrão (KMP / BM)</div>
+          <div class="page-sub">Casamento de padrões sobre o campo "nome" de Pacientes ou Médicos</div></div>
+      </div>
+
+      <div class="card" style="padding:20px;margin-bottom:18px">
+        <div class="form-row cols-3">
+          <div class="form-group">
+            <label>Tabela / Entidade</label>
+            <select id="pq-entidade">
+              <option value="pacientes">Pacientes (campo: nome)</option>
+              <option value="medicos">Médicos (campo: nome)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Algoritmo</label>
+            <select id="pq-algoritmo">
+              <option value="KMP">KMP (Knuth–Morris–Pratt)</option>
+              <option value="BM">Boyer–Moore</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Padrão (string a buscar)</label>
+            <input id="pq-padrao" placeholder="ex: silva" onkeydown="if(event.key==='Enter')executarPesquisaPadrao()">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="executarPesquisaPadrao()">Pesquisar</button>
+        <div class="form-hint" style="margin-top:10px">
+          A busca ignora maiúsculas/minúsculas. KMP usa a tabela de falha (função de prefixo);
+          Boyer–Moore usa as heurísticas Bad Character e Good Suffix, comparando da direita para a esquerda.
+        </div>
+      </div>
+
+      <div id="pq-meta" style="margin-bottom:10px;color:var(--text3);font-size:13px"></div>
+      <div id="pq-resultado" class="table-wrap card"></div>`;
+  },
+
+
   async backup() {
     document.getElementById('content').innerHTML = `
       <div class="page-header">
@@ -543,6 +584,45 @@ function filterConsultaStatus(s) {
   const f = s ? (window._consultas || []).filter(c => c.status === s) : window._consultas;
   document.getElementById('con-table').innerHTML = renderConsultas(f || []);
 }
+
+// ── Pesquisa por padrão dedicada (KMP / BM) — Fase V ──────────────────────────
+async function executarPesquisaPadrao() {
+  const entidade  = document.getElementById('pq-entidade').value;
+  const algoritmo = document.getElementById('pq-algoritmo').value;
+  const padrao    = document.getElementById('pq-padrao').value.trim();
+  const meta = document.getElementById('pq-meta');
+  const area = document.getElementById('pq-resultado');
+
+  if (!padrao) {
+    meta.textContent = 'Informe um padrão para pesquisar.';
+    area.innerHTML = '';
+    return;
+  }
+
+  meta.textContent = `Buscando "${padrao}" com ${algoritmo === 'BM' ? 'Boyer–Moore' : 'KMP'}...`;
+  area.innerHTML = '';
+
+  try {
+    const t0 = performance.now();
+    const res = await API.get(`/api/pesquisar?entidade=${entidade}&algoritmo=${algoritmo}&q=${encodeURIComponent(padrao)}`);
+    const t1 = performance.now();
+    const lista = Array.isArray(res) ? res : [];
+
+    meta.textContent = `${lista.length} registro(s) encontrado(s) — algoritmo ${algoritmo === 'BM' ? 'Boyer–Moore' : 'KMP'} — ${(t1 - t0).toFixed(1)} ms`;
+
+    if (entidade === 'medicos') {
+      window._medicos = window._medicos || [];
+      area.innerHTML = renderMedicos(lista);
+    } else {
+      window._pacientes = window._pacientes || [];
+      area.innerHTML = renderPacientes(lista);
+    }
+  } catch (e) {
+    meta.textContent = '';
+    area.innerHTML = `<div class="empty"><div class="icon">⚠️</div><p>Erro ao comunicar com o servidor</p></div>`;
+  }
+}
+
 
 // ── Modal genérico ────────────────────────────────────────────────────────────
 let _editId = null;

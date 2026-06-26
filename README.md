@@ -1,121 +1,70 @@
-# Clínica Médica — AED III · PUC Minas
+# Sistema de Gerenciamento de Clinica Medica — AED III
 
-Sistema de gerenciamento de dados em memória secundária com índices B+ e Hash Extensível.
+Trabalho Pratico de AED III (Algoritmos e Estruturas de Dados III), PUC Minas, sob orientacao do Prof. Walisson Ferreira de Carvalho.
 
----
+Aplicativo de gerenciamento de dados em memoria secundaria, com indices proprios (Hash Extensivel e Arvore B+), relacionamentos 1:N e N:N, compactacao (Huffman e LZW), casamento de padroes (KMP e Boyer-Moore) e criptografia XOR — tudo implementado do zero, sem uso de SGBDs ou bibliotecas externas de persistencia.
 
-## Documentação — Fase III
-
-> **Relacionamento N:N com Tabela Intermediária**
-
-[Documentacao_Fase3_AED3.pdf](docs/Documentacao_Fase3_AED3.pdf)
-
----
-
-## Estrutura do Projeto
+## Estrutura do projeto
 
 ```
-clinica/
-├── src/clinica/
-│   ├── Main.java                        ← ponto de entrada
-│   ├── model/                           ← entidades
-│   │   ├── Usuario.java
-│   │   ├── Paciente.java
-│   │   ├── Medico.java
-│   │   ├── Especialidade.java
-│   │   ├── Consulta.java
-│   │   └── MedicoEspecialidade.java     ← tabela N:N
-│   ├── dao/                             ← persistência em arquivos binários
-│   │   ├── BaseDAO.java                 ← cabeçalho + exclusão lógica
-│   │   ├── UsuarioDAO.java
-│   │   ├── PacienteDAO.java
-│   │   ├── MedicoDAO.java
-│   │   ├── EspecialidadeDAO.java
-│   │   ├── ConsultaDAO.java
-│   │   └── MedicoEspecialidadeDAO.java
-│   ├── index/                           ← estruturas em memória secundária
-│   │   ├── HashExtensivel.java          ← busca por igualdade (chave primária)
-│   │   └── ArvoreBMais.java             ← busca ordenada e por intervalo
-│   ├── service/
-│   │   └── ClinicaService.java          ← regras de negócio
-│   ├── controller/
-│   │   └── ClinicaHttpServer.java       ← API REST + arquivos estáticos
-│   └── util/
-│       ├── CriptoXOR.java               ← criptografia de senha (Fase 5)
-│       └── JsonParser.java              ← parser JSON manual
-├── web/                                 ← frontend SPA
-│   ├── index.html
-│   ├── css/style.css
-│   └── js/app.js
-├── docs/
-│   └── Documentacao_Fase3_AED3.pdf     ← documentação técnica da Fase III
-├── data/                                ← arquivos binários gerados em runtime
-└── bin/                                 ← bytecode compilado
+src/clinica/
+  controller/   -> ClinicaHttpServer.java (API REST)
+  dao/          -> DAOs de cada entidade (persistencia em arquivos binarios)
+  index/        -> HashExtensivel, ArvoreBMais, OrdenacaoExterna
+  model/        -> Entidades (Paciente, Medico, Consulta, Especialidade, Usuario, ...)
+  service/      -> ClinicaService (regras de negocio), CompactacaoService
+  util/         -> CasamentoPadroes (KMP/BM), CriptoXOR, Huffman, LZW, JsonParser
+web/
+  index.html, css/style.css, js/app.js  -> frontend (SPA simples, sem frameworks)
+data/   -> arquivos binarios gerados em runtime (.dat, .hdir, .hbkt, .btree)
 ```
 
----
+## Como compilar e executar
 
-## Como Executar
+Pre-requisito: JDK 17 ou superior.
 
-### Pré-requisito
-- Java 17+ (usa `--enable-preview` não necessário — apenas Java 17 LTS)
-
-### Compilar e rodar
 ```bash
-chmod +x run.sh
-./run.sh
+# Compilar
+find src -name "*.java" | xargs javac -d bin
+
+# Executar
+java -cp bin -DdataDir=data -DwebDir=web clinica.Main
 ```
 
-Acesse **http://localhost:8080**
+O sistema fica disponivel em `http://localhost:8080`.
 
-Login padrão: `admin` / `admin123`
+Login padrao: `admin` / `admin123`. Tambem e possivel criar uma conta nova diretamente na tela de login, pelo link "Criar conta".
 
----
+## Fases implementadas
 
-## Arquivos Binários Gerados
-
-| Arquivo | Conteúdo |
+| Fase | Conteudo |
 |---|---|
-| `data/pacientes.dat` | Registros de pacientes (629 bytes/reg) |
-| `data/pacientes.hdir` + `.hbkt` | Índice Hash Extensível por ID |
-| `data/pacientes.btree` | Índice Árvore B+ por ID |
-| `data/medicos.dat` | Registros de médicos (375 bytes/reg) |
-| `data/consultas.dat` | Registros de consultas (651 bytes/reg) |
-| `data/medico_especialidade.dat` | Tabela N:N (13 bytes/reg) |
-| `data/usuarios.dat` | Usuários com senha XOR cifrada |
+| 1 | Modelagem, CRUD de todas as tabelas, persistencia binaria com cabecalho |
+| 2 | Hash Extensivel, Arvore B+, relacionamento 1:N, ordenacao externa |
+| 3 | Tabela N:N Medico-Especialidade com chave composta, indexacao dupla, listagem ordenada via B+ |
+| 4 | Compactacao Huffman e LZW (backup completo do diretorio de dados), KMP e Boyer-Moore (pesquisa textual) |
+| 5 | Interface dedicada de pesquisa por padrao (KMP / Boyer-Moore) e criptografia XOR documentadas |
 
-### Formato do cabeçalho de cada `.dat`
-```
-Bytes 0-3  : int  numRegistrosAtivos
-Bytes 4-7  : int  ultimoIdGerado
-Bytes 8-11 : int  tamanhoRegistro
-Bytes 12+  : registros de tamanho fixo
-```
+## Documentacao
 
----
+A documentacao tecnica de cada fase, com o detalhamento dos algoritmos, trechos de codigo-fonte (com caminho do arquivo indicado) e evidencias reais de execucao, esta disponivel em:
 
-## Fases Implementadas
+- [`docs/Documentacao_Fase4_AED3.docx`](docs/Documentacao_Fase4_AED3.docx) — Compactacao (Huffman/LZW) e casamento de padroes
+- [`docs/Documentacao_Fase5_AED3.docx`](docs/Documentacao_Fase5_AED3.docx) — KMP, Boyer-Moore (Bad Character + Good Suffix) e criptografia XOR
 
-| Fase | Status | O que está pronto |
+## Principais endpoints da API
+
+| Metodo | Endpoint | Descricao |
 |---|---|---|
-| Fase 1 | Concluída | Modelagem, CRUD de todas as tabelas, persistência binária com cabeçalho |
-| Fase 2 | Concluída | Hash Extensível, Árvore B+, relacionamento 1:N, ordenação externa |
-| Fase 3 | Concluída | Tabela N:N com chave composta, Hash duplo, listagem ordenada via B+ |
-| Fase 4 | Pendente | Huffman, LZW, Boyer-Moore, KMP |
-| Fase 5 | Pendente (estrutura pronta) | Login com XOR (CriptoXOR.java já implementado) |
+| POST | `/api/login` | Autenticacao (retorna token) |
+| POST | `/api/registrar` | Auto-cadastro de novo usuario (rota publica) |
+| GET/POST/PUT/DELETE | `/api/pacientes`, `/api/medicos`, `/api/especialidades`, `/api/consultas` | CRUD das entidades |
+| GET/POST/DELETE | `/api/vinculos` | Relacionamento N:N Medico <-> Especialidade |
+| GET | `/api/ordenar` | Ordenacao externa por intercalacao |
+| GET | `/api/listar-ordenado` | Listagem ordenada via travessia da Arvore B+ |
+| POST/GET | `/api/compactar` | Gera (`POST`) ou restaura (`GET`) backup compactado (Huffman/LZW) |
+| GET | `/api/pesquisar` | Casamento de padroes (KMP/BM) sobre o campo nome de Pacientes/Medicos |
 
----
+## Autor
 
-## API REST
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| POST | `/api/login` | Autenticação — retorna token Bearer |
-| GET/POST/PUT/DELETE | `/api/pacientes[/id]` | CRUD pacientes |
-| GET/POST/PUT/DELETE | `/api/medicos[/id]` | CRUD médicos |
-| GET/POST/PUT/DELETE | `/api/especialidades[/id]` | CRUD especialidades |
-| GET/POST/PUT/DELETE | `/api/consultas[/id]` | CRUD consultas |
-| GET/POST/DELETE | `/api/vinculos` | Relacionamento N:N Médico↔Especialidade |
-| GET | `/api/listar-ordenado?entidade=medicos` | Listagem ordenada via travessia da Árvore B+ |
-| GET | `/api/listar-ordenado?entidade=consultas` | Listagem ordenada via travessia da Árvore B+ |
-| GET/POST/DELETE | `/api/usuarios[/id]` | Gestão de usuários |
+Davi Lucas — PUC Minas, AED III.
